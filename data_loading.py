@@ -2,7 +2,7 @@ from sklearn.model_selection import train_test_split
 from pathlib import Path
 from os.path import abspath
 from torch.utils.data import DataLoader
-from pytorch_lightning import LightningDataModule
+from lightning import LightningDataModule
 from monai.data import CacheDataset
 from monai.transforms import Compose, LoadImaged, EnsureChannelFirstd, ResizeD, NormalizeIntensityd
 

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from pytorch_lightning import LightningModule, Trainer
+from lightning import LightningModule
 from torchmetrics.functional import mean_squared_error
 from typing import Callable, List
 
@@ -203,6 +203,9 @@ class UNet(nn.Module):
         return self.final_activation(self.layers[-1](xi[-1]))
 
 class LitUNet(LightningModule):
+    '''
+    Lighting version on the Unet Model
+    '''
     def __init__(
         self,
         n_dims: int,
@@ -215,7 +218,44 @@ class LitUNet(LightningModule):
         final_activation: nn.Module = nn.Identity(),
         learning_rate: float = 1e-3,
         loss_fn: Callable = F.mse_loss,
-    ):
+    ) -> None:
+        '''
+        Initializes the LitUNet Lightning module, a PyTorch Lightning wrapper 
+        around a U-Net model for deep learning tasks.
+    
+        Parameters:
+        ----------
+        n_dims : int
+            The number of spatial dimensions (2 for 2D or 3 for 3D data).
+        in_channels : int, optional
+            Number of input channels to the model (default is 1).
+        out_channels : int, optional
+            Number of output channels from the model (default is 1).
+        base_channels : int, optional
+            Number of base channels in the U-Net's encoder (default is 8).
+        depth : int, optional
+            Depth of the U-Net (number of downsampling steps, default is 4).
+        use_transpose : bool, optional
+            Whether to use transpose convolutions for upsampling 
+            (default is False, using interpolation instead).
+        use_normalization : bool, optional
+            Whether to apply normalization layers in the U-Net (default is True).
+        final_activation : nn.Module, optional
+            Activation function applied to the model's output (default is nn.Identity).
+        learning_rate : float, optional
+            Learning rate for the optimizer (default is 1e-3).
+        loss_fn : Callable, optional
+            Loss function to optimize during training (default is F.mse_loss).
+    
+        Attributes:
+        ----------
+        loss_fn : Callable
+            The loss function used for model training.
+        learning_rate : float
+            The learning rate for the optimizer.
+        model : UNet
+            The underlying U-Net model configured with the specified parameters.
+        '''
         super().__init__()
         self.save_hyperparameters()
 
