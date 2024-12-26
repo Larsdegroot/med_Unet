@@ -1,6 +1,9 @@
 # Data folder
 data/*
 
+# Logging
+lightning_logs/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
