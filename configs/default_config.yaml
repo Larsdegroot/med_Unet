@@ -1,4 +1,5 @@
 # lightning.pytorch==2.4.0
+# For argument documentation check: https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api
 seed_everything: true
 trainer:
   accelerator: auto
@@ -22,14 +23,14 @@ trainer:
   val_check_interval: null
   check_val_every_n_epoch: 1
   num_sanity_val_steps: null
-  log_every_n_steps: null
-  enable_checkpointing: null
-  enable_progress_bar: null
+  log_every_n_steps: 10
+  enable_checkpointing: True
+  enable_progress_bar: True
   enable_model_summary: null
   accumulate_grad_batches: 1
   gradient_clip_val: null
   gradient_clip_algorithm: null
-  deterministic: null
+  deterministic: True
   benchmark: null
   inference_mode: true
   use_distributed_sampler: true
@@ -39,7 +40,7 @@ trainer:
   plugins: null
   sync_batchnorm: false
   reload_dataloaders_every_n_epochs: 0
-  default_root_dir: null
+  default_root_dir: null #This should be changed to "med_Unet/checkpoints" when training with google colab
 model:
   n_dims: 3
   in_channels: 1
@@ -56,6 +57,7 @@ data:
   data_dir: "data/WMH"
   batch_size: 8
   num_workers: 8
+dataset: "WMH"
 optimizer: null
 lr_scheduler: null
-ckpt_path: null
+ckpt_path: null # this should change to pre-trained model checkpoint for fine-tuning
