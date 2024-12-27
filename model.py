@@ -280,7 +280,7 @@ class LitUNet(LightningModule):
 
     def training_step(self, batch, batch_idx):
         # x, y = batch
-        x = batch['flair']
+        x = batch['flair'] # TODO fix this so both brats and wmh work
         y = batch['WMH']
         y_hat = self.forward(x)
         loss = self.loss_fn(y_hat, y)
@@ -297,7 +297,7 @@ class LitUNet(LightningModule):
         self.log("val_loss", val_loss, prog_bar=True)
 
     def test_step(self, batch, batch_idx):
-        x, y = batch
+        x, y = batch # TODO edit this
         y_hat = self.forward(x)
         test_loss = self.loss_fn(y_hat, y)
         self.log("test_loss", test_loss, prog_bar=True)

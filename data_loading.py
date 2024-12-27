@@ -24,7 +24,7 @@ class MRIDataModule(LightningDataModule):
         self,
         dataset: str = "WMH",
         data_dir_wmh: str = "data/wmh",
-        data_dir_brats: str = "data/BraTS"
+        data_dir_brats: str = "data/BraTS",
         batch_size: int = 8,
         num_workers: int = 8
     ):
@@ -50,6 +50,7 @@ class MRIDataModule(LightningDataModule):
             raise MisconfigurationException(f'"{dataset}" is not a supported dataset, use either "WMH" or "brats"')
             
         self.data_dir = Path(data_dir)
+        self.dataset = dataset
         self.batch_size = batch_size
         self.num_workers = num_workers
 
@@ -68,6 +69,13 @@ class MRIDataModule(LightningDataModule):
             NormalizeIntensityd(keys=["flair", "t1"])
         ])
 
+        self.train_transforms_brats = Compose([
+            LoadImaged(keys=["t1ce", "t2", "flair", "t1", "seg"]),
+            EnsureChannelFirstd(keys=["t1ce", "t2", "flair", "t1", "seg"]),
+            ResizeD(keys=["t1ce", "t2", "flair", "t1", "seg"], spatial_size=(128, 128, 128)), # NEEDS TO BE REMOVED WHEN A BETTER SOLUTION GETS IMPLEMENTED
+            NormalizeIntensityd(keys=["t1ce", "t2", "flair", "t1"])
+        ])
+
     def collect_samples_wmh(self, root: Path) -> list[dict]:
         """
         Collect all the valid sample paths from the wmh dataset.
@@ -83,11 +91,13 @@ class MRIDataModule(LightningDataModule):
             List of dictionaries with paths to FLAIR, T1, and WMH files.
         """
         samples = []
-        for subject_dir in root.iterdir():
-            if subject_dir.is_dir():
-                flair_path = subject_dir / "FLAIR.nii.gz"
-                t1_path = subject_dir / "T1.nii.gz"
-                wmh_path = subject_dir / "wmh.nii.gz"
+        for city in ["Utrecht", "Singapore", "Amsterdam"]:
+            city_dir = root.joinpath(city)
+            for subject_dir in city_dir.iterdir():
+                if subject_dir.is_dir():
+                    flair_path = subject_dir / "FLAIR.nii.gz"
+                    t1_path = subject_dir / "T1.nii.gz"
+                    wmh_path = subject_dir / "wmh.nii.gz"
 
                 # Ensure all necessary files exist
                 if flair_path.exists() and t1_path.exists() and wmh_path.exists():
@@ -95,7 +105,7 @@ class MRIDataModule(LightningDataModule):
                 else:
                     print(f"Missing files in {subject_dir}")
         return samples
-
+    
     def collect_samples_brats(self, root: Path) -> list[dict]:
         """
         Collect all the valid sample paths from the wmh dataset.
@@ -110,18 +120,41 @@ class MRIDataModule(LightningDataModule):
         list[dict]
             List of dictionaries with paths to FLAIR, T1, and WMH files.
         """
+        brats_data_dir = root.joinpath("Data")
         samples = []
-        for subject_dir in root.iterdir():
+        
+        for subject_dir in brats_data_dir.iterdir():
             if subject_dir.is_dir():
-                flair_path = subject_dir / "FLAIR.nii.gz"
-                t1_path = subject_dir / "T1.nii.gz"
-                wmh_path = subject_dir / "wmh.nii.gz"
+                file_paths = subject_dir.glob("*.nii.gz")
 
+                # Assign file to name
+                t1ce_path, flair_path, t2_path, seg_path, t1_path = (None, None, None, None, None)
+                for file_path in file_paths:
+                    if file_path.stem.split("_")[-1] == "t1ce.nii":
+                        t1ce_path = file_path
+                    elif file_path.stem.split("_")[-1] == "flair.nii":
+                        flair_path = file_path
+                    elif file_path.stem.split("_")[-1] == "t2.nii":
+                        t2_path = file_path
+                    elif file_path.stem.split("_")[-1] == "seg.nii":
+                        seg_path = file_path
+                    elif file_path.stem.split("_")[-1] == "t1.nii":
+                        t1_path = file_path
+                    else:
+                        print(f"Missing files in {subject_dir}")
+                            
                 # Ensure all necessary files exist
-                if flair_path.exists() and t1_path.exists() and wmh_path.exists():
-                    samples.append({"flair": flair_path, "t1": t1_path, "WMH": wmh_path})
+                if t1ce_path.exists() and flair_path.exists() and t2_path.exists() and seg_path.exists() and t1_path.exists():
+                    samples.append({
+                        "t1ce": t1ce_path,
+                        "flair": flair_path,
+                        "t2": t2_path,
+                        "seg": seg_path,
+                        "t1": t1_path
+                    })
                 else:
-                    print(f"Missing files in {subject_dir}")
+                    continue
+                    
         return samples
 
     def setup(self, stage: str = None):
@@ -135,20 +168,27 @@ class MRIDataModule(LightningDataModule):
         """
         # Collect sample paths from the dataset
         all_samples = []
-        for subject_path in self.data_dir.iterdir():
-            if subject_path.is_dir():
-                all_samples.extend(self.collect_samples_wmh(subject_path))
+        if self.dataset.lower() == "wmh":
+            all_samples.extend(self.collect_samples_wmh(self.data_dir))
+        elif self.dataset.lower() == "brats":
+            all_samples.extend(self.collect_samples_brats(self.data_dir))
 
         # Split into train, validation, and test sets
-        if self.
-        train_samples, temp_samples = train_test_split(all_samples, train_size=0.8, random_state=42, shuffle=True)
-        val_samples, test_samples = train_test_split(temp_samples, test_size=0.5, random_state=42, shuffle=True)
+        if self.dataset.lower() == "wmh":
+            train_samples, temp_samples = train_test_split(all_samples, train_size=0.8, random_state=42, shuffle=True)
+            val_samples, test_samples = train_test_split(temp_samples, test_size=0.5, random_state=42, shuffle=True)
 
-        # Cache the datasets for performance
-        self.train_dataset = CacheDataset(train_samples, transform=self.train_transforms)
-        self.val_dataset = CacheDataset(val_samples, transform=self.val_transforms)
-        self.test_dataset = CacheDataset(test_samples, transform=self.val_transforms)  # Same transforms for test
+            # Cache the datasets for performance
+            self.train_dataset = CacheDataset(train_samples, transform=self.train_transforms)
+            self.val_dataset = CacheDataset(val_samples, transform=self.val_transforms)
+            self.test_dataset = CacheDataset(test_samples, transform=self.val_transforms)  # Same transforms for test
 
+        elif self.dataset.lower() == "brats": # brats is used for pre_training so no split is required
+            train_samples = all_samples
+
+            # Cache the dataset for performance
+            self.train_dataset = CacheDataset(train_samples, transform=self.train_transforms_brats)
+            
     def train_dataloader(self):
         """
         Training DataLoader.
