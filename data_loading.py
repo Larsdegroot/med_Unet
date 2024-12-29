@@ -5,14 +5,19 @@ from os.path import abspath
 from torch.utils.data import DataLoader
 from lightning import LightningDataModule
 from monai.data import CacheDataset
-from monai.transforms import Compose, LoadImaged, EnsureChannelFirstd, ResizeD, NormalizeIntensityd
+from monai.transforms import Compose, LoadImaged, EnsureChannelFirstd, ResizeD, NormalizeIntensityd, MapTransform
 from lightning.pytorch.utilities.exceptions import MisconfigurationException
 
 
 ### TODO:
 # Bas - implement loading of BRATS dataset
 # Eva - Expand on transformations
-# Someone - Implement a way to setup the dataset for 2D data
+# Someone - Implement a way to setup the dataset for 2D data - lars is picking this up
+# We'll be trying to implement this: https://github.com/Project-MONAI/tutorials/blob/main/modules/2d_inference_3d_volume.ipynb
+# Lars - make dataloader output matrixes 
+
+# Shape of tensors in the batch is [batch_size, channels, Width, Depth, Height]
+# 
 
 class MRIDataModule(LightningDataModule):
     """
@@ -22,14 +27,16 @@ class MRIDataModule(LightningDataModule):
 
     def __init__(
         self,
+        include_keys: list = ["flair", "t1", "WMH"],
         dataset: str = "WMH",
         data_dir_wmh: str = "data/wmh",
         data_dir_brats: str = "data/BraTS",
+        data_mode: str = "2d",
         batch_size: int = 8,
-        num_workers: int = 8
+        num_workers: int = 8,
     ):
         """
-        Initialize the data module.
+        Initialize the data module to load either the wmh dataset or the BraTS dataset.
 
         Parameters
         ----------
@@ -43,29 +50,65 @@ class MRIDataModule(LightningDataModule):
         super().__init__()
         
         if dataset.lower() == "wmh":
+            # set data_dir
             data_dir = data_dir_wmh
+            
+            # Check if keys are correct
+            if include_keys: # if include keys not empty 
+                if any([key not in ["flair", "t1", "WMH"] for key in include_keys]):
+                    raise MisconfigurationException(f'Unsupported key for WMH dataset, use any combination of ["flair", "t1", "WMH"]')
+                else:
+                    self.include_keys = include_keys
+            
         elif dataset.lower() == "brats":
+            # set data_dir
             data_dir = data_dir_brats
+
+            # Check if keys are correct
+            if include_keys: # if include keys not empty 
+                if any([key not in ["t1ce", "t2", "flair", "t1", "seg"] for key in include_keys]):
+                    raise MisconfigurationException(f'Unsupported key for brats dataset, use any combination of ["t1ce", "t2", "flair", "t1", "seg"]')
+                else:
+                    self.include_keys = include_keys
         else:
             raise MisconfigurationException(f'"{dataset}" is not a supported dataset, use either "WMH" or "brats"')
-            
+
         self.data_dir = Path(data_dir)
-        self.dataset = dataset
+        self.dataset = dataset.lower()
         self.batch_size = batch_size
         self.num_workers = num_workers
+        self.data_mode = data_mode
 
         # Define transformations
-        self.train_transforms = Compose([
+        self.train_transforms_wmh_3D = Compose([
             LoadImaged(keys=["flair", "t1", "WMH"]),
             EnsureChannelFirstd(keys=["flair", "t1", "WMH"]),
             ResizeD(keys=["flair", "t1", "WMH"], spatial_size=(128, 128, 128)), # NEEDS TO BE REMOVED WHEN A BETTER SOLUTION GETS IMPLEMENTED
             NormalizeIntensityd(keys=["flair", "t1"])
         ])
 
-        self.val_transforms = Compose([
+        self.val_transforms_wmh_3D = Compose([
             LoadImaged(keys=["flair", "t1", "WMH"]),
             EnsureChannelFirstd(keys=["flair", "t1", "WMH"]),
             ResizeD(keys=["flair", "t1", "WMH"], spatial_size=(128, 128, 128)), # NEEDS TO BE REMOVED WHEN A BETTER SOLUTION GETS IMPLEMENTED
+            NormalizeIntensityd(keys=["flair", "t1"])
+        ])
+
+        self.train_transforms_wmh_2D = Compose([
+            LoadImaged(keys=["flair", "t1", "WMH"]),
+            EnsureChannelFirstd(keys=["flair", "t1", "WMH"]),
+            ResizeD(keys=["flair", "t1", "WMH"], spatial_size=(128, 128, 128)), # NEEDS TO BE REMOVED WHEN A BETTER SOLUTION GETS IMPLEMENTED
+            Slice3DTo2D(keys=["flair", "t1", "WMH"], axis=3), # Third dimension is top down view
+            FlattenSlices(image_keys=["flair", "t1"], label_key="WMH"),
+            NormalizeIntensityd(keys=["flair", "t1"])
+        ])
+
+        self.val_transforms_wmh_2D = Compose([
+            LoadImaged(keys=["flair", "t1", "WMH"]),
+            EnsureChannelFirstd(keys=["flair", "t1", "WMH"]),
+            Slice3DTo2D(keys=["flair", "t1", "WMH"], axis=3), # Third dimension is top down view
+            FlattenSlices(image_keys=["flair", "t1"], label_key="WMH"),
+            ResizeD(keys=["flair", "t1", "WMH"], spatial_size=(128, 128)), # NEEDS TO BE REMOVED WHEN A BETTER SOLUTION GETS IMPLEMENTED
             NormalizeIntensityd(keys=["flair", "t1"])
         ])
 
@@ -100,11 +143,20 @@ class MRIDataModule(LightningDataModule):
                     wmh_path = subject_dir / "wmh.nii.gz"
 
                 # Ensure all necessary files exist
-                if flair_path.exists() and t1_path.exists() and wmh_path.exists():
+                if flair_path.exists() and t1_path.exists() and wmh_path.exists():                    
                     samples.append({"flair": flair_path, "t1": t1_path, "WMH": wmh_path})
                 else:
                     print(f"Missing files in {subject_dir}")
-        return samples
+
+        # remove file paths that are not in include_keys
+        filtered_samples = []
+        for sample in samples:
+            for key in sample.keys():
+                if key not in self.include_keys:
+                    sample.pop(key)
+                    filtered_samples.append(sample)
+                    
+        return filtered_samples
     
     def collect_samples_brats(self, root: Path) -> list[dict]:
         """
@@ -154,8 +206,16 @@ class MRIDataModule(LightningDataModule):
                     })
                 else:
                     continue
+
+        # remove file paths that are not in include_keys
+        filtered_samples = []
+        for sample in samples:
+            for key in sample.keys():
+                if key not in self.include_keys:
+                    sample.pop(key)
+                    filtered_samples.append(sample)
                     
-        return samples
+        return filtered_samples
 
     def setup(self, stage: str = None):
         """
@@ -166,22 +226,29 @@ class MRIDataModule(LightningDataModule):
         stage : str
             Stage of training: 'fit', 'test', etc.
         """
-        # Collect sample paths from the dataset
+        # Collect sample paths from the the chosen dataset
         all_samples = []
         if self.dataset.lower() == "wmh":
             all_samples.extend(self.collect_samples_wmh(self.data_dir))
         elif self.dataset.lower() == "brats":
             all_samples.extend(self.collect_samples_brats(self.data_dir))
-
+        
         # Split into train, validation, and test sets
         if self.dataset.lower() == "wmh":
             train_samples, temp_samples = train_test_split(all_samples, train_size=0.8, random_state=42, shuffle=True)
             val_samples, test_samples = train_test_split(temp_samples, test_size=0.5, random_state=42, shuffle=True)
 
-            # Cache the datasets for performance
-            self.train_dataset = CacheDataset(train_samples, transform=self.train_transforms)
-            self.val_dataset = CacheDataset(val_samples, transform=self.val_transforms)
-            self.test_dataset = CacheDataset(test_samples, transform=self.val_transforms)  # Same transforms for test
+            if self.data_mode.lower() == "2d":
+                # Cache the datasets for performance
+                self.train_dataset = CacheDataset(train_samples, transform=self.train_transforms_wmh_2D)
+                self.val_dataset = CacheDataset(val_samples, transform=self.val_transforms_wmh_2D)
+                self.test_dataset = CacheDataset(test_samples, transform=self.val_transforms_wmh_2D)  # Same transforms for test
+                
+            elif self.data_mode.lower() == "3d":
+                # Cache the datasets for performance
+                self.train_dataset = CacheDataset(train_samples, transform=self.train_transforms_wmh_3D)
+                self.val_dataset = CacheDataset(val_samples, transform=self.val_transforms_wmh_3D)
+                self.test_dataset = CacheDataset(test_samples, transform=self.val_transforms_wmh_3D)  # Same transforms for test
 
         elif self.dataset.lower() == "brats": # brats is used for pre_training so no split is required
             train_samples = all_samples

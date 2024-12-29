@@ -16,7 +16,7 @@ from lightning.pytorch.utilities.exceptions import MisconfigurationException
 #             raise MisconfigurationException(f'"{self.config["dataset"]}" is not a supported dataset, use either "WMH" or "brats" ')
 
 def cli_main():
-    cli = MyLightningCLI(LitUNet, MRIDataModule)
+    cli = LightningCLI(LitUNet, MRIDataModule)
 
 
 if __name__ == "__main__":

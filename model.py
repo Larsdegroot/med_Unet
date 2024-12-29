@@ -205,11 +205,13 @@ class UNet(nn.Module):
 
 class LitUNet(LightningModule):
     '''
-    Lighting version on the Unet Model
+    Lighting version of the Unet Model
     '''
     def __init__(
         self,
         n_dims: int,
+        input_keys: list = ["flair", "t1"],
+        label_key: str = "WMH",
         in_channels: int = 1,
         out_channels: int = 1,
         base_channels: int = 8,
@@ -281,9 +283,32 @@ class LitUNet(LightningModule):
     def forward(self, x):
         return self.model(x)
 
+    def _extract_inputs_and_labels(batch, input_keys, label_key):
+        """
+        Extracts the input modalities and segmentation labels from the batch.
+    
+        Parameters
+        ----------
+        batch : dict
+            The batch containing the data.
+        input_keys : list[str]
+            List of keys representing input modalities.
+        label_key : str
+            The key representing the segmentation map.
+    
+        Returns
+        -------
+        x : torch.Tensor
+            Concatenated input modalities.
+        y : torch.Tensor
+            Segmentation map.
+        """
+        x = torch.cat([batch[key] for key in input_keys], dim=1) 
+        y = batch[label_key]
+        return x, y
+
     def training_step(self, batch, batch_idx):
-        x = batch['flair'] # TODO fix this so both brats and wmh work
-        y = batch['WMH']
+        x, y = self._extract_inputs_and_labels(batch, self.input_keys, self.label_key)
         
         if self.use_sliding_window:
             y_hat = sliding_window_inference(
