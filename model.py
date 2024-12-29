@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 from lightning import LightningModule
 from torchmetrics.functional import mean_squared_error
 from typing import Callable, List
+from monai.inferers import sliding_window_inference
 
 class DoubleConv(nn.Module):
     def __init__(
@@ -216,6 +217,7 @@ class LitUNet(LightningModule):
         use_transpose: bool = False,
         use_normalization: bool = True,
         final_activation: nn.Module = nn.Identity(),
+        use_sliding_window: bool = False,
         learning_rate: float = 1e-3,
         loss_fn: Callable = F.mse_loss,
     ) -> None:
@@ -259,9 +261,10 @@ class LitUNet(LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        # Loss and learning rate
+        # Loss and learning rate and sliding window
         self.loss_fn = loss_fn
         self.learning_rate = learning_rate
+        self.use_sliding_window = use_sliding_window
 
         # UNet model setup
         self.model = UNet(
@@ -279,26 +282,63 @@ class LitUNet(LightningModule):
         return self.model(x)
 
     def training_step(self, batch, batch_idx):
-        # x, y = batch
         x = batch['flair'] # TODO fix this so both brats and wmh work
         y = batch['WMH']
-        y_hat = self.forward(x)
+        
+        if self.use_sliding_window:
+            y_hat = sliding_window_inference(
+                x,
+                (32, 32, 32),
+                self.batch_size * 4,
+                self.model,
+                overlap=0.25,
+                mode="gaussian",
+                progress=False,
+            )
+        else:
+            y_hat = self.forward(x)
+            
         loss = self.loss_fn(y_hat, y)
         self.log("train_loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        # print(batch) # DEBUG
-        # x, y = batch
-        x = batch['flair']
+        x = batch['flair'] # TODO fix this so both brats and wmh work
         y = batch['WMH']
-        y_hat = self.forward(x)
+        
+        if self.use_sliding_window:
+            y_hat = sliding_window_inference(
+                x,
+                (32, 32, 32),
+                self.batch_size * 4,
+                self.model,
+                overlap=0.25,
+                mode="gaussian",
+                progress=False,
+            )
+        else:
+            y_hat = self.forward(x)
+            
         val_loss = self.loss_fn(y_hat, y)
         self.log("val_loss", val_loss, prog_bar=True)
 
     def test_step(self, batch, batch_idx):
-        x, y = batch # TODO edit this
-        y_hat = self.forward(x)
+        x = batch['flair'] # TODO fix this so both brats and wmh work
+        y = batch['WMH']
+
+        if self.use_sliding_window:
+            y_hat = sliding_window_inference(
+                x,
+                (32, 32, 32),
+                self.batch_size * 4,
+                self.model,
+                overlap=0.25,
+                mode="gaussian",
+                progress=False,
+            )
+        else:
+            y_hat = self.forward(x)
+            
         test_loss = self.loss_fn(y_hat, y)
         self.log("test_loss", test_loss, prog_bar=True)
 
