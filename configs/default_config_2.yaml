@@ -9,7 +9,7 @@ trainer:
   logger: null
   callbacks: null
   fast_dev_run: false
-  max_epochs: null
+  max_epochs: 4
   min_epochs: null
   max_steps: -1
   min_steps: null
@@ -22,16 +22,16 @@ trainer:
   val_check_interval: null
   check_val_every_n_epoch: 1
   num_sanity_val_steps: null
-  log_every_n_steps: null
-  enable_checkpointing: null
-  enable_progress_bar: null
+  log_every_n_steps: 10
+  enable_checkpointing: True
+  enable_progress_bar: True
   enable_model_summary: null
   accumulate_grad_batches: 1
   gradient_clip_val: null
   gradient_clip_algorithm: null
-  deterministic: null
+  deterministic: True
   benchmark: null
-  inference_mode: true
+  inference_mode: True
   use_distributed_sampler: true
   profiler: null
   detect_anomaly: false
@@ -41,12 +41,12 @@ trainer:
   reload_dataloaders_every_n_epochs: 0
   default_root_dir: null
 model:
-  n_dims: null
+  n_dims: 3
   input_keys:
   - flair
   - t1
   label_key: WMH
-  in_channels: 1
+  in_channels: 2 
   out_channels: 1
   base_channels: 8
   depth: 4
@@ -54,7 +54,11 @@ model:
   use_normalization: true
   final_activation:
     class_path: torch.nn.Identity
-  use_sliding_window: false
+  inferer: sliding_window
+  inferer_params: 
+      roi_size: [32, 32, 32]
+      sw_batch_size: 4
+      overlap: 0.25
   learning_rate: 0.001
   loss_fn: torch.nn.functional.mse_loss
 data:
@@ -65,8 +69,8 @@ data:
   dataset: WMH
   data_dir_wmh: data/wmh
   data_dir_brats: data/BraTS
-  data_mode: 2d
-  batch_size: 8
+  data_mode: 3d
+  batch_size: 4
   num_workers: 8
 optimizer: null
 lr_scheduler: null

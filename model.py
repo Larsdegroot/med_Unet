@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from lightning import LightningModule
 from torchmetrics.functional import mean_squared_error
 from typing import Callable, List
-from monai.inferers import sliding_window_inference
+from monai.inferers import SlidingWindowInferer, SliceInferer, SimpleInferer
 
 class DoubleConv(nn.Module):
     def __init__(
@@ -219,7 +219,8 @@ class LitUNet(LightningModule):
         use_transpose: bool = False,
         use_normalization: bool = True,
         final_activation: nn.Module = nn.Identity(),
-        use_sliding_window: bool = False,
+        inferer: str = "sliding_window",
+        inferer_params: dict = None,
         learning_rate: float = 1e-3,
         loss_fn: Callable = F.mse_loss,
     ) -> None:
@@ -230,7 +231,11 @@ class LitUNet(LightningModule):
         Parameters:
         ----------
         n_dims : int
-            The number of spatial dimensions (2 for 2D or 3 for 3D data).
+            The number of spatial dimensions (2 for 2D or 3D data).
+        input_keys : list[str]
+            List of keys representing input modalities.
+        label_key : str
+            The key representing the segmentation map.
         in_channels : int, optional
             Number of input channels to the model (default is 1).
         out_channels : int, optional
@@ -246,27 +251,28 @@ class LitUNet(LightningModule):
             Whether to apply normalization layers in the U-Net (default is True).
         final_activation : nn.Module, optional
             Activation function applied to the model's output (default is nn.Identity).
+        inferer : str, optional
+            Type of inferer to use: "sliding_window", "slice", or "simple" (default is "sliding_window").
+        inferer_params : dict, optional
+            Additional parameters for the inferer (default is None).
         learning_rate : float, optional
             Learning rate for the optimizer (default is 1e-3).
         loss_fn : Callable, optional
             Loss function to optimize during training (default is F.mse_loss).
-    
-        Attributes:
-        ----------
-        loss_fn : Callable
-            The loss function used for model training.
-        learning_rate : float
-            The learning rate for the optimizer.
-        model : UNet
-            The underlying U-Net model configured with the specified parameters.
         '''
         super().__init__()
         self.save_hyperparameters()
 
-        # Loss and learning rate and sliding window
+        # Loss and learning rate 
         self.loss_fn = loss_fn
         self.learning_rate = learning_rate
-        self.use_sliding_window = use_sliding_window
+
+        # Input and label keys
+        ### Defining a collate_fn in out dataloader might achieve the same result as what we are doing here
+        self.input_keys = input_keys
+        self.label_key = label_key
+        print(f"input keys: {self.input_keys}") # DEBUG
+        print(f"label key: {self.label_key}") # DEBUG
 
         # UNet model setup
         self.model = UNet(
@@ -280,10 +286,20 @@ class LitUNet(LightningModule):
             final_activation=final_activation,
         )
 
+        inferer_params = inferer_params or {}
+        if inferer.lower() == "sliding_window":
+            self.inferer = SlidingWindowInferer(**inferer_params)
+        elif inferer.lower() == "slice":
+            self.inferer = SliceInferer(**inferer_params)
+        elif inferer.lower() == "simple":
+            self.inferer = SimpleInferer()
+        else:
+            raise ValueError(f'"{inferer}" is not a supported inferer type. Use "sliding_window", "slice", or "simple".')
+
     def forward(self, x):
         return self.model(x)
 
-    def _extract_inputs_and_labels(batch, input_keys, label_key):
+    def _extract_inputs_and_labels(self, batch, input_keys, label_key):
         """
         Extracts the input modalities and segmentation labels from the batch.
     
@@ -309,61 +325,20 @@ class LitUNet(LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, y = self._extract_inputs_and_labels(batch, self.input_keys, self.label_key)
-        
-        if self.use_sliding_window:
-            y_hat = sliding_window_inference(
-                x,
-                (32, 32, 32),
-                self.batch_size * 4,
-                self.model,
-                overlap=0.25,
-                mode="gaussian",
-                progress=False,
-            )
-        else:
-            y_hat = self.forward(x)
-            
+        y_hat = self.inferer(x, self.model)
         loss = self.loss_fn(y_hat, y)
         self.log("train_loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x = batch['flair'] # TODO fix this so both brats and wmh work
-        y = batch['WMH']
-        
-        if self.use_sliding_window:
-            y_hat = sliding_window_inference(
-                x,
-                (32, 32, 32),
-                self.batch_size * 4,
-                self.model,
-                overlap=0.25,
-                mode="gaussian",
-                progress=False,
-            )
-        else:
-            y_hat = self.forward(x)
-            
+        x, y = self._extract_inputs_and_labels(batch, self.input_keys, self.label_key)
+        y_hat = self.inferer(x, self.model)
         val_loss = self.loss_fn(y_hat, y)
         self.log("val_loss", val_loss, prog_bar=True)
 
     def test_step(self, batch, batch_idx):
-        x = batch['flair'] # TODO fix this so both brats and wmh work
-        y = batch['WMH']
-
-        if self.use_sliding_window:
-            y_hat = sliding_window_inference(
-                x,
-                (32, 32, 32),
-                self.batch_size * 4,
-                self.model,
-                overlap=0.25,
-                mode="gaussian",
-                progress=False,
-            )
-        else:
-            y_hat = self.forward(x)
-            
+        x, y = self._extract_inputs_and_labels(batch, self.input_keys, self.label_key)
+        y_hat = self.inferer(x, self.model)
         test_loss = self.loss_fn(y_hat, y)
         self.log("test_loss", test_loss, prog_bar=True)
 

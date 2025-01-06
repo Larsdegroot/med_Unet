@@ -5,7 +5,7 @@ from os.path import abspath
 from torch.utils.data import DataLoader
 from lightning import LightningDataModule
 from monai.data import CacheDataset
-from monai.transforms import Compose, LoadImaged, EnsureChannelFirstd, ResizeD, NormalizeIntensityd, MapTransform
+from monai.transforms import Compose, LoadImaged, EnsureChannelFirstd, ResizeD, NormalizeIntensityd, MapTransform, RandSpatialCrop
 from lightning.pytorch.utilities.exceptions import MisconfigurationException
 
 
@@ -94,28 +94,10 @@ class MRIDataModule(LightningDataModule):
             NormalizeIntensityd(keys=["flair", "t1"])
         ])
 
-        self.train_transforms_wmh_2D = Compose([
-            LoadImaged(keys=["flair", "t1", "WMH"]),
-            EnsureChannelFirstd(keys=["flair", "t1", "WMH"]),
-            ResizeD(keys=["flair", "t1", "WMH"], spatial_size=(128, 128, 128)), # NEEDS TO BE REMOVED WHEN A BETTER SOLUTION GETS IMPLEMENTED
-            Slice3DTo2D(keys=["flair", "t1", "WMH"], axis=3), # Third dimension is top down view
-            FlattenSlices(image_keys=["flair", "t1"], label_key="WMH"),
-            NormalizeIntensityd(keys=["flair", "t1"])
-        ])
-
-        self.val_transforms_wmh_2D = Compose([
-            LoadImaged(keys=["flair", "t1", "WMH"]),
-            EnsureChannelFirstd(keys=["flair", "t1", "WMH"]),
-            Slice3DTo2D(keys=["flair", "t1", "WMH"], axis=3), # Third dimension is top down view
-            FlattenSlices(image_keys=["flair", "t1"], label_key="WMH"),
-            ResizeD(keys=["flair", "t1", "WMH"], spatial_size=(128, 128)), # NEEDS TO BE REMOVED WHEN A BETTER SOLUTION GETS IMPLEMENTED
-            NormalizeIntensityd(keys=["flair", "t1"])
-        ])
-
         self.train_transforms_brats = Compose([
             LoadImaged(keys=["t1ce", "t2", "flair", "t1", "seg"]),
             EnsureChannelFirstd(keys=["t1ce", "t2", "flair", "t1", "seg"]),
-            ResizeD(keys=["t1ce", "t2", "flair", "t1", "seg"], spatial_size=(128, 128, 128)), # NEEDS TO BE REMOVED WHEN A BETTER SOLUTION GETS IMPLEMENTED
+            ResizeD(keys=["flair", "t1", "WMH"], spatial_size=(128, 128, 128)), # NEEDS TO BE REMOVED WHEN A BETTER SOLUTION GETS IMPLEMENTED
             NormalizeIntensityd(keys=["t1ce", "t2", "flair", "t1"])
         ])
 
@@ -150,11 +132,14 @@ class MRIDataModule(LightningDataModule):
 
         # remove file paths that are not in include_keys
         filtered_samples = []
+        # print(f"include keys: {self.include_keys}") # DEBUG
+        # print(f"dataset keys: {list(samples[0].keys())}") # DEBUG
         for sample in samples:
             for key in sample.keys():
                 if key not in self.include_keys:
                     sample.pop(key)
-                    filtered_samples.append(sample)
+                filtered_samples.append(sample)
+                
                     
         return filtered_samples
     
@@ -235,6 +220,7 @@ class MRIDataModule(LightningDataModule):
         
         # Split into train, validation, and test sets
         if self.dataset.lower() == "wmh":
+            # print(f"Amount of samples in dataset: {len(all_samples)}") # DEBUG
             train_samples, temp_samples = train_test_split(all_samples, train_size=0.8, random_state=42, shuffle=True)
             val_samples, test_samples = train_test_split(temp_samples, test_size=0.5, random_state=42, shuffle=True)
 
