@@ -33,7 +33,7 @@ class MRIDataModule(LightningDataModule):
         self,
         include_keys: list = ["flair", "t1", "WMH"],
         dataset: str = "WMH",
-        data_dir_wmh: str = "data/wmh",
+        data_dir_wmh: str = "data/WMH",
         data_dir_brats: str = "data/BraTS",
         data_mode: str = "2d",
         batch_size: int = 8,
