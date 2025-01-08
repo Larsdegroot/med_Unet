@@ -67,7 +67,7 @@ data:
   - t1
   - WMH
   dataset: WMH
-  data_dir_wmh: data/wmh
+  data_dir_wmh: data/WMH
   data_dir_brats: data/BraTS
   data_mode: 3d
   batch_size: 4
