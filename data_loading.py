@@ -77,7 +77,7 @@ class MRIDataModule(LightningDataModule):
         else:
             raise MisconfigurationException(f'"{dataset}" is not a supported dataset, use either "WMH" or "brats"')
 
-        self.data_dir = Path(data_dir).resolve()
+        self.data_dir = REPO_DIR.joinpath(data_dir).resolve()
         self.dataset = dataset.lower()
         self.batch_size = batch_size
         self.num_workers = num_workers
