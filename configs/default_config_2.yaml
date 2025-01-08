@@ -29,7 +29,7 @@ trainer:
   accumulate_grad_batches: 1
   gradient_clip_val: null
   gradient_clip_algorithm: null
-  deterministic: True
+  deterministic: False
   benchmark: null
   inference_mode: True
   use_distributed_sampler: true
