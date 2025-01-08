@@ -17,7 +17,11 @@ from lightning.pytorch.utilities.exceptions import MisconfigurationException
 # Lars - make dataloader output matrixes 
 
 # Shape of tensors in the batch is [batch_size, channels, Width, Depth, Height]
-# 
+
+
+# Get the absolute path of the current file (data_loading.py)
+CURRENT_DIR = Path(__file__).resolve().parent
+REPO_DIR = CURRENT_DIR  # Adjust if data_loading.py is nested deeper
 
 class MRIDataModule(LightningDataModule):
     """
@@ -73,7 +77,7 @@ class MRIDataModule(LightningDataModule):
         else:
             raise MisconfigurationException(f'"{dataset}" is not a supported dataset, use either "WMH" or "brats"')
 
-        self.data_dir = Path(data_dir)
+        self.data_dir = Path(data_dir).resolve()
         self.dataset = dataset.lower()
         self.batch_size = batch_size
         self.num_workers = num_workers
