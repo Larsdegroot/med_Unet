@@ -1,0 +1,77 @@
+# lightning.pytorch==2.4.0
+seed_everything: true
+trainer:
+  accelerator: auto
+  strategy: auto
+  devices: auto
+  num_nodes: 1
+  precision: 16 #We can set this to a number for reduced memory usage and faster training.
+  logger: null
+  callbacks: null # We can add code for this to enable model chekpointing and save the best model. 
+  fast_dev_run: True #True = quick debugging. 
+  max_epochs: 2
+  min_epochs: null
+  max_steps: -1
+  min_steps: null
+  max_time: null
+  limit_train_batches: 0.3 #Only use 30% to train.
+  limit_val_batches: 0.3 #Only use 30% to validate data.
+  limit_test_batches: null
+  limit_predict_batches: null
+  overfit_batches: 0.0
+  val_check_interval: null
+  check_val_every_n_epoch: 1
+  num_sanity_val_steps: null
+  log_every_n_steps: 10
+  enable_checkpointing: True
+  enable_progress_bar: True
+  enable_model_summary: null
+  accumulate_grad_batches: 1
+  gradient_clip_val: 0.5 #To prevent instability. 
+  gradient_clip_algorithm: null
+  deterministic: False
+  benchmark: null
+  inference_mode: True
+  use_distributed_sampler: true
+  profiler: null
+  detect_anomaly: false
+  barebones: false
+  plugins: null
+  sync_batchnorm: false
+  reload_dataloaders_every_n_epochs: 0
+  default_root_dir: "med_Unet/chekpoints" #This should be changed to "med_Unet/checkpoints" when training with google colab
+model: 
+  n_dims: 3 #3 = 3 dimensional 2 = 2D etc. 
+  input_keys: #input data.
+  - flair
+  - t1
+  label_key: WMH #Target label.
+  in_channels: 2  #amount of input keys.
+  out_channels: 1
+  base_channels: 8 #Amount of features
+  depth: 4  #Layers. 
+  use_transpose: false #Use of transposed convolution.
+  use_normalization: true 
+  final_activation: #activation function
+    class_path: torch.nn.Identity #no activation atm.
+  inferer: sliding_window # Turns larger images into smaller patches.
+  inferer_params: #Parameters for sliding window intereference. 
+      roi_size: [32, 32, 32]  # ROI size. 
+      sw_batch_size: 4
+      overlap: 0.25
+  learning_rate: 0.001 #Lower is better but more time or stuck, Higher is worse but faster. 
+  loss_fn: torch.nn.functional.mse_loss  #Mean squared error is used. 
+data:
+  include_keys:
+  - flair
+  - t1
+  - WMH
+  dataset: WMH
+  data_dir_wmh: data/WMH
+  data_dir_brats: data/BraTS
+  data_mode: 3d
+  batch_size: 4
+  num_workers: 8
+optimizer: null
+lr_scheduler: null
+ckpt_path: null
