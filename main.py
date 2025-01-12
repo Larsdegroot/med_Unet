@@ -17,7 +17,7 @@ from lightning.pytorch.utilities.exceptions import MisconfigurationException
 #             raise MisconfigurationException(f'"{self.config["dataset"]}" is not a supported dataset, use either "WMH" or "brats" ')
 
 def cli_main():
-    cli = LightningCLI(LitUNet, MRIDataModule, save_config_overwrite=True)
+    cli = LightningCLI(LitUNet, MRIDataModule)
 
     # config logger using config file
     log_config = cli.config['trainer']['logger']
