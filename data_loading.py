@@ -5,7 +5,7 @@ from os.path import abspath
 from torch.utils.data import DataLoader
 from lightning import LightningDataModule
 from monai.data import CacheDataset
-from monai.transforms import Compose, LoadImaged, EnsureChannelFirstd, ResizeD, NormalizeIntensityd, MapTransform, RandSpatialCrop
+from monai.transforms import Compose, LoadImaged, EnsureChannelFirstd, ResizeD, NormalizeIntensityd, MapTransform, RandSpatialCropd, RandFlipd, RandRotated, RandAffined
 from lightning.pytorch.utilities.exceptions import MisconfigurationException
 
 
@@ -87,9 +87,22 @@ class MRIDataModule(LightningDataModule):
         self.train_transforms_wmh_3D = Compose([
             LoadImaged(keys=["flair", "t1", "WMH"]),
             EnsureChannelFirstd(keys=["flair", "t1", "WMH"]),
-            ResizeD(keys=["flair", "t1", "WMH"], spatial_size=(128, 128, 128)), # NEEDS TO BE REMOVED WHEN A BETTER SOLUTION GETS IMPLEMENTED
+            RandSpatialCropd(keys=["flair", "t1", "WMH"], roi_size=(32, 32, 32)),  # Crop all to the same shape
+            RandFlipd(keys=["flair", "t1", "WMH"], prob=0.5, spatial_axis=0), 
+            RandRotated(
+                keys=["flair", "t1", "WMH"], 
+                range_x=(-30, 30),  # Rotation range in degrees around x-axis
+                range_y=(-30, 30),  # Rotation range in degrees around y-axis
+                range_z=(-30, 30),  # Rotation range in degrees around z-axis
+                prob=0.5,           # Probability of applying the rotation
+                mode=("bilinear", "bilinear", "nearest"),  # Interpolation for flair, t1, and WMH
+                align_corners=True
+            ), 
+            RandAffined(keys=["flair", "t1", "WMH"], prob=0.5, rotate_range=(0, 30), shear_range=(0.05, 0.1), scale_range=(0.9, 1.1)), 
+            #mt.ResizeD(keys=["flair", "t1", "WMH"], spatial_size=(128, 128, 128)),  # Resize all to the same shape #TODO - remove?
             NormalizeIntensityd(keys=["flair", "t1"])
         ])
+
 
         self.val_transforms_wmh_3D = Compose([
             LoadImaged(keys=["flair", "t1", "WMH"]),
