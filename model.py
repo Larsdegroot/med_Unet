@@ -6,6 +6,8 @@ from lightning import LightningModule
 from torchmetrics.functional import mean_squared_error
 from typing import Callable, List
 from monai.inferers import SlidingWindowInferer, SliceInferer, SimpleInferer
+from torch.utils.tensorboard import SummaryWriter
+from sklearn.metrics import f1_score, recall_score
 
 class DoubleConv(nn.Module):
     def __init__(
@@ -296,6 +298,8 @@ class LitUNet(LightningModule):
         else:
             raise ValueError(f'"{inferer}" is not a supported inferer type. Use "sliding_window", "slice", or "simple".')
 
+        self.writer = SummaryWriter()
+
     def forward(self, x):
         return self.model(x)
 
@@ -328,20 +332,70 @@ class LitUNet(LightningModule):
         y_hat = self.inferer(x, self.model)
         loss = self.loss_fn(y_hat, y)
         self.log("train_loss", loss, prog_bar=True)
+        
+        # Log the loss to TensorBoard
+        self.writer.add_scalar("Loss/train", loss, self.global_step)
+        
         return loss
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx):# f1 and recall do not work here 
         x, y = self._extract_inputs_and_labels(batch, self.input_keys, self.label_key)
         y_hat = self.inferer(x, self.model)
         val_loss = self.loss_fn(y_hat, y)
         self.log("val_loss", val_loss, prog_bar=True)
+        
+        # Log the validation loss to TensorBoard
+        self.writer.add_scalar("Loss/val", val_loss, self.global_step)
+        
+        # Convert predictions to binary labels
+        y_pred = y_hat.argmax(dim=1).cpu().numpy().flatten()
+        y_true = y.cpu().numpy().flatten()
+        
+        # Ensure y_true is binary
+        y_true = (y_true > 0).astype(int)
+        
+        # Calculate F1 score and recall
+        val_f1 = f1_score(y_true, y_pred, average='macro')
+        val_recall = recall_score(y_true, y_pred, average='macro')
+        
+        # Log the metrics to TensorBoard
+        self.writer.add_scalar("F1/val", val_f1, self.global_step)
+        self.writer.add_scalar("Recall/val", val_recall, self.global_step)
+        
+        # Log the metrics to the progress bar
+        self.log("val_f1", val_f1, prog_bar=True)
+        self.log("val_recall", val_recall, prog_bar=True)
 
-    def test_step(self, batch, batch_idx):
+    def test_step(self, batch, batch_idx):# f1 and recall do not work here
         x, y = self._extract_inputs_and_labels(batch, self.input_keys, self.label_key)
         y_hat = self.inferer(x, self.model)
         test_loss = self.loss_fn(y_hat, y)
         self.log("test_loss", test_loss, prog_bar=True)
+        
+        # Log the test loss to TensorBoard
+        self.writer.add_scalar("Loss/test", test_loss, self.global_step)
+        
+        # Convert predictions to binary labels
+        y_pred = y_hat.argmax(dim=1).cpu().numpy().flatten()
+        y_true = y.cpu().numpy().flatten()
+        
+        # Ensure y_true is binary
+        y_true = (y_true > 0).astype(int)
+        
+        # Calculate F1 score and recall
+        test_f1 = f1_score(y_true, y_pred, average='macro')
+        test_recall = recall_score(y_true, y_pred, average='macro')
+        
+        # Log the metrics to TensorBoard
+        self.writer.add_scalar("F1/test", test_f1, self.global_step)
+        self.writer.add_scalar("Recall/test", test_recall, self.global_step)
+        
+        # Log the metrics to the progress bar
+        self.log("test_f1", test_f1, prog_bar=True)
+        self.log("test_recall", test_recall, prog_bar=True)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         return optimizer
+
+    
