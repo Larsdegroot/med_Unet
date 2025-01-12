@@ -354,7 +354,7 @@ class LitUNet(LightningModule):
         self.log("train_loss", loss, prog_bar=True)
         
         # Log the loss to TensorBoard
-        self.writer.add_scalar("Loss/train", loss, self.global_step)
+        # self.writer.add_scalar("Loss/train", loss, self.global_step)
         
         return loss
 
@@ -409,7 +409,7 @@ class LitUNet(LightningModule):
         # print(f"y_true: {y_true}") # DEBUG
         
         # Calculate F1 score and recall
-        self.log_dict(self.validation_metrics(y_pred, y_true))
+        self.log_dict(self.validation_metrics(y_pred, y_true), on_step=True, on_epoch=True)
         
         # val_f1 = f1_score(y_true, y_pred, average='macro')
         # val_recall = recall_score(y_true, y_pred, average='macro')
