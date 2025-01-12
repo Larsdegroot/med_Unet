@@ -351,7 +351,7 @@ class LitUNet(LightningModule):
         y_hat = torch.softmax(y_hat, dim=1) # TRYING OUT SHOULD BE CHANGED LATER
         
         loss = self.loss_fn(y_hat, y)
-        self.log("train_loss", loss, prog_bar=True)
+        # self.log("train_loss", loss, prog_bar=True)
 
         ######## Copied from validation
         y_pred = (y_hat > 0.5).int()
@@ -380,7 +380,7 @@ class LitUNet(LightningModule):
         x, y = self._extract_inputs_and_labels(batch, self.input_keys, self.label_key)
         y_hat = self.inferer(x, self.model)
         val_loss = self.loss_fn(y_hat, y)
-        self.log("val_loss", val_loss, prog_bar=True)
+        # self.log("val_loss", val_loss, prog_bar=True)
         
         # Log the validation loss to TensorBoard
         # self.writer.add_scalar("Loss/val", val_loss, self.global_step)
