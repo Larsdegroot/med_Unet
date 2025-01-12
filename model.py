@@ -367,7 +367,7 @@ class LitUNet(LightningModule):
         y_true = y_true.view(-1)
         
         # Calculate F1 score and recall
-        self.log_dict(self.validation_metrics(y_pred, y_true), on_step=True, on_epoch=True)
+        self.log_dict(self.validation_metrics(y_pred, y_true), on_step=True, on_epoch=True, prog_bar=True, logger=True)
 
         ##############
         
@@ -427,7 +427,7 @@ class LitUNet(LightningModule):
         # print(f"y_true: {y_true}") # DEBUG
         
         # Calculate F1 score and recall
-        self.log_dict(self.validation_metrics(y_pred, y_true), on_step=True, on_epoch=True)
+        self.log_dict(self.validation_metrics(y_pred, y_true), on_step=True, on_epoch=True, prog_bar=True, logger=True)
         
         # val_f1 = f1_score(y_true, y_pred, average='macro')
         # val_recall = recall_score(y_true, y_pred, average='macro')
