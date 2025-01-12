@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchmetrics
 from torch.utils.data import DataLoader
 from lightning import LightningModule
-from torchmetrics.functional import mean_squared_error
 from typing import Callable, List
 from monai.inferers import SlidingWindowInferer, SliceInferer, SimpleInferer
 from torch.utils.tensorboard import SummaryWriter
@@ -273,8 +273,8 @@ class LitUNet(LightningModule):
         ### Defining a collate_fn in out dataloader might achieve the same result as what we are doing here
         self.input_keys = input_keys
         self.label_key = label_key
-        print(f"input keys: {self.input_keys}") # DEBUG
-        print(f"label key: {self.label_key}") # DEBUG
+        # print(f"input keys: {self.input_keys}") # DEBUG
+        # print(f"label key: {self.label_key}") # DEBUG
 
         # UNet model setup
         self.model = UNet(
@@ -288,6 +288,7 @@ class LitUNet(LightningModule):
             final_activation=final_activation,
         )
 
+        # Setting Monai inference
         inferer_params = inferer_params or {}
         if inferer.lower() == "sliding_window":
             self.inferer = SlidingWindowInferer(**inferer_params)
@@ -298,6 +299,18 @@ class LitUNet(LightningModule):
         else:
             raise ValueError(f'"{inferer}" is not a supported inferer type. Use "sliding_window", "slice", or "simple".')
 
+        num_classes = 2 
+        # Setting validation and test metrics
+        self.validation_metrics = torchmetrics.MetricCollection(
+            {
+                "accuracy": torchmetrics.classification.Accuracy(task="binary", num_classes=num_classes),
+                "precision": torchmetrics.classification.Precision(task="binary", num_classes=num_classes),
+                "recall": torchmetrics.classification.Recall(task="binary", num_classes=num_classes),
+                "f1": torchmetrics.classification.F1Score(task="binary", num_classes=num_classes)
+            },
+            prefix="val_",
+        )
+        
         self.writer = SummaryWriter()
 
     def forward(self, x):
@@ -330,6 +343,13 @@ class LitUNet(LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = self._extract_inputs_and_labels(batch, self.input_keys, self.label_key)
         y_hat = self.inferer(x, self.model)
+
+        # Ensure y is binary
+        # y = (y > 0).int()
+        
+        # Apply softmax to get probabilities
+        y_hat = torch.softmax(y_hat, dim=1) # TRYING OUT SHOULD BE CHANGED LATER
+        
         loss = self.loss_fn(y_hat, y)
         self.log("train_loss", loss, prog_bar=True)
         
@@ -345,26 +365,62 @@ class LitUNet(LightningModule):
         self.log("val_loss", val_loss, prog_bar=True)
         
         # Log the validation loss to TensorBoard
-        self.writer.add_scalar("Loss/val", val_loss, self.global_step)
+        # self.writer.add_scalar("Loss/val", val_loss, self.global_step)
+
+        # DEBUG
+        # print("BEFORE CONVERSION") 
+        # print(f"y_pred shape: {y_hat.shape}")
+        # print(f"y_pred: {y_hat}") 
+        # print("====================================================") 
+        # print(f"y_true shape: {y.shape}") 
+        # print(f"y_true unique values: {torch.unique(y)}")
+        # print(f"y_true: {y}") 
+
+        # Apply softmax to get probabilities
+        y_hat = torch.softmax(y_hat, dim=1) # TRYING OUT SHOULD BE CHANGED LATER
         
         # Convert predictions to binary labels
-        y_pred = y_hat.argmax(dim=1).cpu().numpy().flatten()
-        y_true = y.cpu().numpy().flatten()
+        ### NOTE: this assumes that the logist are converted to probabilties using nn.SoftMax as the final activation layer
+        y_pred = (y_hat > 0.5).int()
+
+        # Ensure y is binary
+        y = (y > 0).int()
         
-        # Ensure y_true is binary
-        y_true = (y_true > 0).astype(int)
+        # Ensure y_true is in the correct shape and type
+        y_true = y.squeeze(1).long()
+
+        # Flatten tensors for metric computation
+        y_pred = y_pred.view(-1)
+        y_true = y_true.view(-1)
+        
+        # y_pred = y_hat.argmax(dim=1).cpu().numpy().flatten()
+        # y_true = y.cpu().numpy().flatten()
+        
+        # # Ensure y_true is binary
+        # y_true = (y_true > 0).astype(int)
+
+        # DEBUG
+        # print("AFTER CONVERSION")
+        # print(f"y_pred shape: {y_pred.shape}")
+        # print(f"y_pred unique values: {torch.unique(y_pred)}")
+        # print(f"y_pred: {y_pred}") # DEBUG
+        # print("====================================================")
+        # print(f"y_true shape: {y_true.shape}")
+        # print(f"y_true: {y_true}") # DEBUG
         
         # Calculate F1 score and recall
-        val_f1 = f1_score(y_true, y_pred, average='macro')
-        val_recall = recall_score(y_true, y_pred, average='macro')
+        self.log_dict(self.validation_metrics(y_pred, y_true))
+        
+        # val_f1 = f1_score(y_true, y_pred, average='macro')
+        # val_recall = recall_score(y_true, y_pred, average='macro')
         
         # Log the metrics to TensorBoard
-        self.writer.add_scalar("F1/val", val_f1, self.global_step)
-        self.writer.add_scalar("Recall/val", val_recall, self.global_step)
+        # self.writer.add_scalar("F1/val", val_f1, self.global_step)
+        # self.writer.add_scalar("Recall/val", val_recall, self.global_step)
         
         # Log the metrics to the progress bar
-        self.log("val_f1", val_f1, prog_bar=True)
-        self.log("val_recall", val_recall, prog_bar=True)
+        # self.log("val_f1", val_f1, prog_bar=True)
+        # self.log("val_recall", val_recall, prog_bar=True)
 
     def test_step(self, batch, batch_idx):# f1 and recall do not work here
         x, y = self._extract_inputs_and_labels(batch, self.input_keys, self.label_key)
