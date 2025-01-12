@@ -184,7 +184,7 @@ class UNet(nn.Module):
         
         self.layers = nn.ModuleList(layers)
         if final_activation is not None:
-            self.final_activation = final_activation
+            self.final_activation = nn.Softmax(dim=1)
         else:
             self.final_activation = nn.Identity()
 
@@ -299,7 +299,7 @@ class LitUNet(LightningModule):
         else:
             raise ValueError(f'"{inferer}" is not a supported inferer type. Use "sliding_window", "slice", or "simple".')
 
-        num_classes = 2 
+        num_classes = 1 
         # Setting validation and test metrics
         self.validation_metrics = torchmetrics.MetricCollection(
             {
@@ -348,7 +348,7 @@ class LitUNet(LightningModule):
         # y = (y > 0).int()
         
         # Apply softmax to get probabilities
-        y_hat = torch.softmax(y_hat, dim=1) # TRYING OUT SHOULD BE CHANGED LATER
+        # y_hat = torch.softmax(y_hat, dim=1) # TRYING OUT SHOULD BE CHANGED LATER
         
         loss = self.loss_fn(y_hat, y)
         # self.log("train_loss", loss, prog_bar=True)
@@ -367,7 +367,7 @@ class LitUNet(LightningModule):
         y_true = y_true.view(-1)
         
         # Calculate F1 score and recall
-        self.log_dict(self.validation_metrics(y_pred, y_true), on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log_dict(self.validation_metrics(y_pred, y_true), on_step=True, on_epoch=False, prog_bar=True, logger=True)
 
         ##############
         
@@ -395,7 +395,7 @@ class LitUNet(LightningModule):
         # print(f"y_true: {y}") 
 
         # Apply softmax to get probabilities
-        y_hat = torch.softmax(y_hat, dim=1) # TRYING OUT SHOULD BE CHANGED LATER
+        # y_hat = torch.softmax(y_hat, dim=1) # TRYING OUT SHOULD BE CHANGED LATER
         
         # Convert predictions to binary labels
         ### NOTE: this assumes that the logist are converted to probabilties using nn.SoftMax as the final activation layer
@@ -427,7 +427,7 @@ class LitUNet(LightningModule):
         # print(f"y_true: {y_true}") # DEBUG
         
         # Calculate F1 score and recall
-        self.log_dict(self.validation_metrics(y_pred, y_true), on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log_dict(self.validation_metrics(y_pred, y_true), on_step=False, on_epoch=True, prog_bar=True, logger=True)
         
         # val_f1 = f1_score(y_true, y_pred, average='macro')
         # val_recall = recall_score(y_true, y_pred, average='macro')
