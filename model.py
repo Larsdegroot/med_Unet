@@ -352,6 +352,24 @@ class LitUNet(LightningModule):
         
         loss = self.loss_fn(y_hat, y)
         self.log("train_loss", loss, prog_bar=True)
+
+        ######## Copied from validation
+        y_pred = (y_hat > 0.5).int()
+
+        # Ensure y is binary
+        y = (y > 0).int()
+        
+        # Ensure y_true is in the correct shape and type
+        y_true = y.squeeze(1).long()
+
+        # Flatten tensors for metric computation
+        y_pred = y_pred.view(-1)
+        y_true = y_true.view(-1)
+        
+        # Calculate F1 score and recall
+        self.log_dict(self.validation_metrics(y_pred, y_true), on_step=True, on_epoch=True)
+
+        ##############
         
         # Log the loss to TensorBoard
         # self.writer.add_scalar("Loss/train", loss, self.global_step)
