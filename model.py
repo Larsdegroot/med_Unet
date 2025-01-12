@@ -184,7 +184,7 @@ class UNet(nn.Module):
         
         self.layers = nn.ModuleList(layers)
         if final_activation is not None:
-            self.final_activation = nn.Softmax(dim=1)
+            self.final_activation = final_activation
         else:
             self.final_activation = nn.Identity()
 
@@ -348,7 +348,7 @@ class LitUNet(LightningModule):
         # y = (y > 0).int()
         
         # Apply softmax to get probabilities
-        # y_hat = torch.softmax(y_hat, dim=1) # TRYING OUT SHOULD BE CHANGED LATER
+        y_hat = torch.softmax(y_hat, dim=1) # TRYING OUT SHOULD BE CHANGED LATER
         
         loss = self.loss_fn(y_hat, y)
         # self.log("train_loss", loss, prog_bar=True)
@@ -395,7 +395,7 @@ class LitUNet(LightningModule):
         # print(f"y_true: {y}") 
 
         # Apply softmax to get probabilities
-        # y_hat = torch.softmax(y_hat, dim=1) # TRYING OUT SHOULD BE CHANGED LATER
+        y_hat = torch.softmax(y_hat, dim=1) # TRYING OUT SHOULD BE CHANGED LATER
         
         # Convert predictions to binary labels
         ### NOTE: this assumes that the logist are converted to probabilties using nn.SoftMax as the final activation layer
