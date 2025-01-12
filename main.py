@@ -1,7 +1,6 @@
 from data_loading import MRIDataModule
 from model import LitUNet
 from lightning.pytorch.cli import LightningCLI
-from pytorch_lightning.loggers import TensorBoardLogger
 from lightning.pytorch.utilities.exceptions import MisconfigurationException
 
 # class MyLightningCLI(LightningCLI):
@@ -19,16 +18,6 @@ from lightning.pytorch.utilities.exceptions import MisconfigurationException
 def cli_main():
     cli = LightningCLI(LitUNet, MRIDataModule)
 
-    # config logger using config file
-    log_config = cli.config['trainer']['logger']
-    logger = TensorBoardLogger(save_dir=log_config['save_dir'], name=log_config['name'])
-    cli.trainer.logger = logger
-
-    # config data folders using config file
-    data_path_wmh = cli.config['data']['data_dir_wmh']
-    cli.datamodule.data_dir_wmh = data_path_wmh
-    data_path_brats = cli.config['data']['data_dir_brats']
-    cli.datamodule.data_dir_brats = data_path_brats
 
 if __name__ == "__main__":
     cli_main()
