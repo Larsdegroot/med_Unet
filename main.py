@@ -1,7 +1,6 @@
 from data_loading import MRIDataModule
 from model import LitUNet
 from lightning.pytorch.cli import LightningCLI
-from pytorch_lightning.loggers import TensorBoardLogger
 from lightning.pytorch.utilities.exceptions import MisconfigurationException
 
 # class MyLightningCLI(LightningCLI):
