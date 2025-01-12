@@ -298,8 +298,18 @@ class LitUNet(LightningModule):
         else:
             raise ValueError(f'"{inferer}" is not a supported inferer type. Use "sliding_window", "slice", or "simple".')
 
-        num_classes = 1 
+        
         # Setting validation and test metrics
+        num_classes = 2
+        self.train_metrics = torchmetrics.MetricCollection(
+            {
+                "accuracy": torchmetrics.classification.Accuracy(task="binary", num_classes=num_classes),
+                "precision": torchmetrics.classification.Precision(task="binary", num_classes=num_classes),
+                "f1": torchmetrics.classification.F1Score(task="binary", num_classes=num_classes)
+            },
+            prefix="train_",
+        )
+        
         self.validation_metrics = torchmetrics.MetricCollection(
             {
                 "accuracy": torchmetrics.classification.Accuracy(task="binary", num_classes=num_classes),
@@ -366,14 +376,16 @@ class LitUNet(LightningModule):
         y_true = y_true.view(-1)
         
         # Calculate F1 score and recall
-        batch_metric_values = self.validation_metrics(y_pred, y_true)
+        batch_metric_values = self.train_metrics(y_pred, y_true)
         batch_metric_values['train_loss'] = loss # add loss to metrics
         self.log_dict(batch_metric_values, on_step=True, on_epoch=False, prog_bar=True, logger=True)
 
         ##############
         
         # Log the loss to TensorBoard
-        # self.writer.add_scalar("Loss/train", loss, self.global_step)
+        self.writer.add_scalar("Loss/train", loss, self.global_step)
+        self.writer.add_scalar("accuracy/train", batch_metric_values["train_accuracy"], self.global_step)
+        self.writer.add_scalar("precision/train", batch_metric_values["train_precision"], self.global_step)
         
         return loss
 
@@ -382,9 +394,6 @@ class LitUNet(LightningModule):
         y_hat = self.inferer(x, self.model)
         val_loss = self.loss_fn(y_hat, y)
         # self.log("val_loss", val_loss, prog_bar=True)
-        
-        # Log the validation loss to TensorBoard
-        # self.writer.add_scalar("Loss/val", val_loss, self.global_step)
 
         # DEBUG
         print("BEFORE CONVERSION") 
@@ -397,10 +406,16 @@ class LitUNet(LightningModule):
 
         # Apply softmax to get probabilities
         y_hat = torch.softmax(y_hat, dim=1) # TRYING OUT SHOULD BE CHANGED LATER
+
+        print("AFTER SOFTMAX") 
+        print(f"y_pred shape: {y_hat.shape}")
+        print(f"y_pred: {y_hat}") 
+        print(f"y_pred unique values: {torch.unique(y_hat)}")
+        print("====================================================") 
         
         # Convert predictions to binary labels
         ### NOTE: this assumes that the logist are converted to probabilties using nn.SoftMax as the final activation layer
-        y_pred = (y_hat > 0.5).int()
+        y_pred = (y_hat > 0.5).int() # SOMETHING WRONG HERE
 
         # Ensure y is binary
         y = (y > 0).int()
@@ -433,16 +448,10 @@ class LitUNet(LightningModule):
         batch_metric_values['val_loss'] = val_loss # add loss to metrics
         self.log_dict(batch_metric_values, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         
-        # val_f1 = f1_score(y_true, y_pred, average='macro')
-        # val_recall = recall_score(y_true, y_pred, average='macro')
-        
         # Log the metrics to TensorBoard
-        # self.writer.add_scalar("F1/val", val_f1, self.global_step)
-        # self.writer.add_scalar("Recall/val", val_recall, self.global_step)
-        
-        # Log the metrics to the progress bar
-        # self.log("val_f1", val_f1, prog_bar=True)
-        # self.log("val_recall", val_recall, prog_bar=True)
+        self.writer.add_scalar("accuracy/val", batch_metric_values["val_accuracy"], self.global_step)
+        self.writer.add_scalar("precision/val", batch_metric_values["val_precision"], self.global_step)
+        self.writer.add_scalar("Loss/val", val_loss, self.global_step)
 
     def test_step(self, batch, batch_idx):# f1 and recall do not work here
         x, y = self._extract_inputs_and_labels(batch, self.input_keys, self.label_key)
