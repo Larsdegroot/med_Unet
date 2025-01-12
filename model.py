@@ -128,7 +128,6 @@ class DecoderBlock(nn.Module):
                     conv(in_channels, out_channels, kernel_size=1, padding=0),
                 )
 
-        ## Just
         self.decode = DoubleConv(n_dims, in_channels, out_channels, use_normalization)
 
     def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
@@ -367,7 +366,9 @@ class LitUNet(LightningModule):
         y_true = y_true.view(-1)
         
         # Calculate F1 score and recall
-        self.log_dict(self.validation_metrics(y_pred, y_true), on_step=True, on_epoch=False, prog_bar=True, logger=True)
+        batch_metric_values = self.validation_metrics(y_pred, y_true)
+        batch_metric_values['train_loss'] = loss # add loss to metrics
+        self.log_dict(batch_metric_values, on_step=True, on_epoch=False, prog_bar=True, logger=True)
 
         ##############
         
@@ -386,12 +387,12 @@ class LitUNet(LightningModule):
         # self.writer.add_scalar("Loss/val", val_loss, self.global_step)
 
         # DEBUG
-        # print("BEFORE CONVERSION") 
-        # print(f"y_pred shape: {y_hat.shape}")
-        # print(f"y_pred: {y_hat}") 
-        # print("====================================================") 
-        # print(f"y_true shape: {y.shape}") 
-        # print(f"y_true unique values: {torch.unique(y)}")
+        print("BEFORE CONVERSION") 
+        print(f"y_pred shape: {y_hat.shape}")
+        print(f"y_pred: {y_hat}") 
+        print("====================================================") 
+        print(f"y_true shape: {y.shape}") 
+        print(f"y_true unique values: {torch.unique(y)}")
         # print(f"y_true: {y}") 
 
         # Apply softmax to get probabilities
@@ -418,16 +419,19 @@ class LitUNet(LightningModule):
         # y_true = (y_true > 0).astype(int)
 
         # DEBUG
-        # print("AFTER CONVERSION")
-        # print(f"y_pred shape: {y_pred.shape}")
-        # print(f"y_pred unique values: {torch.unique(y_pred)}")
+        print("AFTER CONVERSION")
+        print(f"y_pred shape: {y_pred.shape}")
+        print(f"y_pred unique values: {torch.unique(y_pred)}")
         # print(f"y_pred: {y_pred}") # DEBUG
-        # print("====================================================")
-        # print(f"y_true shape: {y_true.shape}")
+        print("====================================================")
+        print(f"y_true shape: {y_true.shape}")
+        print(f"y_true unique values: {torch.unique(y_true)}")
         # print(f"y_true: {y_true}") # DEBUG
         
         # Calculate F1 score and recall
-        self.log_dict(self.validation_metrics(y_pred, y_true), on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        batch_metric_values = self.validation_metrics(y_pred, y_true)
+        batch_metric_values['val_loss'] = val_loss # add loss to metrics
+        self.log_dict(batch_metric_values, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         
         # val_f1 = f1_score(y_true, y_pred, average='macro')
         # val_recall = recall_score(y_true, y_pred, average='macro')
