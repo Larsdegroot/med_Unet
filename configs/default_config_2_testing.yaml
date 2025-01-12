@@ -9,7 +9,7 @@ trainer:
   logger: null
   callbacks: null
   fast_dev_run: false
-  max_epochs: 100
+  max_epochs: 4
   min_epochs: null
   max_steps: -1
   min_steps: null
@@ -19,10 +19,10 @@ trainer:
   limit_test_batches: null
   limit_predict_batches: null
   overfit_batches: 0.0
-  val_check_interval: 0.5
-  check_val_every_n_epoch: 10
+  val_check_interval: null
+  check_val_every_n_epoch: 1
   num_sanity_val_steps: null
-  log_every_n_steps: 5
+  log_every_n_steps: 10
   enable_checkpointing: True
   enable_progress_bar: True
   enable_model_summary: null
@@ -30,7 +30,7 @@ trainer:
   gradient_clip_val: null
   gradient_clip_algorithm: null
   deterministic: False
-  benchmark: True
+  benchmark: null
   inference_mode: True
   use_distributed_sampler: true
   profiler: null
@@ -48,8 +48,8 @@ model:
   label_key: WMH
   in_channels: 2 
   out_channels: 1
-  base_channels: 8
-  depth: 4
+  base_channels: 4
+  depth: 2
   use_transpose: false
   use_normalization: true
   final_activation:
@@ -70,8 +70,8 @@ data:
   data_dir_wmh: data/WMH
   data_dir_brats: data/BraTS
   data_mode: 3d
-  batch_size: 1
-  num_workers: 1
+  batch_size: 4
+  num_workers: 8
 optimizer: null
 lr_scheduler: null
 ckpt_path: null

@@ -1,11 +1,13 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchmetrics
 from torch.utils.data import DataLoader
 from lightning import LightningModule
-from torchmetrics.functional import mean_squared_error
 from typing import Callable, List
 from monai.inferers import SlidingWindowInferer, SliceInferer, SimpleInferer
+from torch.utils.tensorboard import SummaryWriter
+from sklearn.metrics import f1_score, recall_score
 
 class DoubleConv(nn.Module):
     def __init__(
@@ -126,7 +128,6 @@ class DecoderBlock(nn.Module):
                     conv(in_channels, out_channels, kernel_size=1, padding=0),
                 )
 
-        ## Just
         self.decode = DoubleConv(n_dims, in_channels, out_channels, use_normalization)
 
     def forward(self, x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
@@ -271,8 +272,8 @@ class LitUNet(LightningModule):
         ### Defining a collate_fn in out dataloader might achieve the same result as what we are doing here
         self.input_keys = input_keys
         self.label_key = label_key
-        print(f"input keys: {self.input_keys}") # DEBUG
-        print(f"label key: {self.label_key}") # DEBUG
+        # print(f"input keys: {self.input_keys}") # DEBUG
+        # print(f"label key: {self.label_key}") # DEBUG
 
         # UNet model setup
         self.model = UNet(
@@ -286,6 +287,7 @@ class LitUNet(LightningModule):
             final_activation=final_activation,
         )
 
+        # Setting Monai inference
         inferer_params = inferer_params or {}
         if inferer.lower() == "sliding_window":
             self.inferer = SlidingWindowInferer(**inferer_params)
@@ -295,6 +297,30 @@ class LitUNet(LightningModule):
             self.inferer = SimpleInferer()
         else:
             raise ValueError(f'"{inferer}" is not a supported inferer type. Use "sliding_window", "slice", or "simple".')
+
+        
+        # Setting validation and test metrics
+        num_classes = 2
+        self.train_metrics = torchmetrics.MetricCollection(
+            {
+                "accuracy": torchmetrics.classification.Accuracy(task="binary", num_classes=num_classes),
+                "precision": torchmetrics.classification.Precision(task="binary", num_classes=num_classes),
+                "f1": torchmetrics.classification.F1Score(task="binary", num_classes=num_classes)
+            },
+            prefix="train_",
+        )
+        
+        self.validation_metrics = torchmetrics.MetricCollection(
+            {
+                "accuracy": torchmetrics.classification.Accuracy(task="binary", num_classes=num_classes),
+                "precision": torchmetrics.classification.Precision(task="binary", num_classes=num_classes),
+                "recall": torchmetrics.classification.Recall(task="binary", num_classes=num_classes),
+                "f1": torchmetrics.classification.F1Score(task="binary", num_classes=num_classes)
+            },
+            prefix="val_",
+        )
+        
+        self.writer = SummaryWriter()
 
     def forward(self, x):
         return self.model(x)
@@ -326,22 +352,137 @@ class LitUNet(LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = self._extract_inputs_and_labels(batch, self.input_keys, self.label_key)
         y_hat = self.inferer(x, self.model)
+
+        # Ensure y is binary
+        # y = (y > 0).int()
+        
+        # Apply softmax to get probabilities
+        y_hat = torch.softmax(y_hat, dim=1) # TRYING OUT SHOULD BE CHANGED LATER
+        
         loss = self.loss_fn(y_hat, y)
-        self.log("train_loss", loss, prog_bar=True)
+        # self.log("train_loss", loss, prog_bar=True)
+
+        ######## Copied from validation
+        y_pred = (y_hat > 0.5).int()
+
+        # Ensure y is binary
+        y = (y > 0).int()
+        
+        # Ensure y_true is in the correct shape and type
+        y_true = y.squeeze(1).long()
+
+        # Flatten tensors for metric computation
+        y_pred = y_pred.view(-1)
+        y_true = y_true.view(-1)
+        
+        # Calculate F1 score and recall
+        batch_metric_values = self.train_metrics(y_pred, y_true)
+        batch_metric_values['train_loss'] = loss # add loss to metrics
+        self.log_dict(batch_metric_values, on_step=True, on_epoch=False, prog_bar=True, logger=True)
+
+        ##############
+        
+        # Log the loss to TensorBoard
+        self.writer.add_scalar("Loss/train", loss, self.global_step)
+        self.writer.add_scalar("accuracy/train", batch_metric_values["train_accuracy"], self.global_step)
+        self.writer.add_scalar("precision/train", batch_metric_values["train_precision"], self.global_step)
+        
         return loss
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx):# f1 and recall do not work here 
         x, y = self._extract_inputs_and_labels(batch, self.input_keys, self.label_key)
         y_hat = self.inferer(x, self.model)
         val_loss = self.loss_fn(y_hat, y)
-        self.log("val_loss", val_loss, prog_bar=True)
+        # self.log("val_loss", val_loss, prog_bar=True)
 
-    def test_step(self, batch, batch_idx):
+        # DEBUG
+        print("BEFORE CONVERSION") 
+        print(f"y_pred shape: {y_hat.shape}")
+        print(f"y_pred: {y_hat}") 
+        print("====================================================") 
+        print(f"y_true shape: {y.shape}") 
+        print(f"y_true unique values: {torch.unique(y)}")
+        # print(f"y_true: {y}") 
+
+        # Apply softmax to get probabilities
+        y_hat = torch.softmax(y_hat, dim=1) # TRYING OUT SHOULD BE CHANGED LATER
+
+        print("AFTER SOFTMAX") 
+        print(f"y_pred shape: {y_hat.shape}")
+        print(f"y_pred: {y_hat}") 
+        print(f"y_pred unique values: {torch.unique(y_hat)}")
+        print("====================================================") 
+        
+        # Convert predictions to binary labels
+        ### NOTE: this assumes that the logist are converted to probabilties using nn.SoftMax as the final activation layer
+        y_pred = (y_hat > 0.5).int() # SOMETHING WRONG HERE
+
+        # Ensure y is binary
+        y = (y > 0).int()
+        
+        # Ensure y_true is in the correct shape and type
+        y_true = y.squeeze(1).long()
+
+        # Flatten tensors for metric computation
+        y_pred = y_pred.view(-1)
+        y_true = y_true.view(-1)
+        
+        # y_pred = y_hat.argmax(dim=1).cpu().numpy().flatten()
+        # y_true = y.cpu().numpy().flatten()
+        
+        # # Ensure y_true is binary
+        # y_true = (y_true > 0).astype(int)
+
+        # DEBUG
+        print("AFTER CONVERSION")
+        print(f"y_pred shape: {y_pred.shape}")
+        print(f"y_pred unique values: {torch.unique(y_pred)}")
+        # print(f"y_pred: {y_pred}") # DEBUG
+        print("====================================================")
+        print(f"y_true shape: {y_true.shape}")
+        print(f"y_true unique values: {torch.unique(y_true)}")
+        # print(f"y_true: {y_true}") # DEBUG
+        
+        # Calculate F1 score and recall
+        batch_metric_values = self.validation_metrics(y_pred, y_true)
+        batch_metric_values['val_loss'] = val_loss # add loss to metrics
+        self.log_dict(batch_metric_values, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        
+        # Log the metrics to TensorBoard
+        self.writer.add_scalar("accuracy/val", batch_metric_values["val_accuracy"], self.global_step)
+        self.writer.add_scalar("precision/val", batch_metric_values["val_precision"], self.global_step)
+        self.writer.add_scalar("Loss/val", val_loss, self.global_step)
+
+    def test_step(self, batch, batch_idx):# f1 and recall do not work here
         x, y = self._extract_inputs_and_labels(batch, self.input_keys, self.label_key)
         y_hat = self.inferer(x, self.model)
         test_loss = self.loss_fn(y_hat, y)
         self.log("test_loss", test_loss, prog_bar=True)
+        
+        # Log the test loss to TensorBoard
+        self.writer.add_scalar("Loss/test", test_loss, self.global_step)
+        
+        # Convert predictions to binary labels
+        y_pred = y_hat.argmax(dim=1).cpu().numpy().flatten()
+        y_true = y.cpu().numpy().flatten()
+        
+        # Ensure y_true is binary
+        y_true = (y_true > 0).astype(int)
+        
+        # Calculate F1 score and recall
+        test_f1 = f1_score(y_true, y_pred, average='macro')
+        test_recall = recall_score(y_true, y_pred, average='macro')
+        
+        # Log the metrics to TensorBoard
+        self.writer.add_scalar("F1/test", test_f1, self.global_step)
+        self.writer.add_scalar("Recall/test", test_recall, self.global_step)
+        
+        # Log the metrics to the progress bar
+        self.log("test_f1", test_f1, prog_bar=True)
+        self.log("test_recall", test_recall, prog_bar=True)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         return optimizer
+
+    
