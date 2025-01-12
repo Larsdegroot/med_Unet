@@ -7,6 +7,7 @@ trainer:
   num_nodes: 1
   precision: null
   logger:
+    class_path: "pytorch_lightning.loggers.tensorboard.TensorBoardLogger"
     init_args:
       save_dir: "/content/onedrive/logs"
       name: "samar_test"
