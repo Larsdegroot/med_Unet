@@ -22,7 +22,7 @@ trainer:
   val_check_interval: null
   check_val_every_n_epoch: 1
   num_sanity_val_steps: null
-  log_every_n_steps: 10
+  log_every_n_steps: 5
   enable_checkpointing: True
   enable_progress_bar: True
   enable_model_summary: null
@@ -68,9 +68,12 @@ data:
   - WMH
   dataset: WMH
   data_dir_wmh: data/wmh
-  data_mode: 3d
   batch_size: 4
   num_workers: 8
 optimizer: torch.optim.Adam
-lr_scheduler: null
+lr_scheduler:
+  type: StepLR
+  params:
+    step_size: 10
+    gamma: 0.1
 ckpt_path: null
