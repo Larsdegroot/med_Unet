@@ -1,5 +1,4 @@
 # lightning.pytorch==2.4.0
-# For argument documentation check: https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api
 seed_everything: true
 trainer:
   accelerator: auto
@@ -10,7 +9,7 @@ trainer:
   logger: null
   callbacks: null
   fast_dev_run: false
-  max_epochs: 4
+  max_epochs: 20
   min_epochs: null
   max_steps: -1
   min_steps: null
@@ -32,7 +31,7 @@ trainer:
   gradient_clip_algorithm: null
   deterministic: True
   benchmark: null
-  inference_mode: true
+  inference_mode: True
   use_distributed_sampler: true
   profiler: null
   detect_anomaly: false
@@ -40,10 +39,14 @@ trainer:
   plugins: null
   sync_batchnorm: false
   reload_dataloaders_every_n_epochs: 0
-  default_root_dir: null #This should be changed to "med_Unet/checkpoints" when training with google colab
+  default_root_dir: null
 model:
   n_dims: 3
-  in_channels: 1
+  input_keys:
+  - flair
+  - t1
+  label_key: WMH
+  in_channels: 2 
   out_channels: 1
   base_channels: 8
   depth: 4
@@ -51,13 +54,23 @@ model:
   use_normalization: true
   final_activation:
     class_path: torch.nn.Identity
+  inferer: simple #
+  inferer_params: 
+      roi_size: [32, 32, 32]
+      sw_batch_size: 4
+      overlap: 0.25
   learning_rate: 0.001
-  loss_fn: torch.nn.functional.mse_loss
+  loss_fn: monai.losses.DiceLoss
 data:
-  data_dir: "data/WMH"
-  batch_size: 8
+  include_keys:
+  - flair
+  - t1
+  - WMH
+  dataset: WMH
+  data_dir_wmh: data/wmh
+  data_mode: 3d # 
+  batch_size: 4
   num_workers: 8
-dataset: "WMH"
-optimizer: null
+optimizer: torch.optim.Adam
 lr_scheduler: null
-ckpt_path: null # this should change to pre-trained model checkpoint for fine-tuning
+ckpt_path: null
