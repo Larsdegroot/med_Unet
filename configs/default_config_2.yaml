@@ -9,7 +9,7 @@ trainer:
   logger: null
   callbacks: null
   fast_dev_run: false
-  max_epochs: 11
+  max_epochs: 100
   min_epochs: null
   max_steps: -1
   min_steps: null
@@ -29,7 +29,7 @@ trainer:
   accumulate_grad_batches: 1
   gradient_clip_val: null
   gradient_clip_algorithm: null
-  deterministic: True
+  deterministic: False
   benchmark: null
   inference_mode: True
   use_distributed_sampler: true
@@ -60,7 +60,7 @@ model:
       sw_batch_size: 4
       overlap: 0.25
   learning_rate: 0.001
-  loss_fn: monai.losses.DiceLoss
+  loss_fn: torch.nn.functional.mse_loss
 data:
   include_keys:
   - flair
@@ -69,7 +69,6 @@ data:
   dataset: WMH
   data_dir_wmh: data/wmh
   #data_dir_brats: data/BraTS
-  data_mode: 3d
   batch_size: 2
   num_workers: 2
 optimizer: torch.optim.Adam
