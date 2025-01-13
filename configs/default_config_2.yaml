@@ -67,7 +67,7 @@ data:
   - t1
   - WMH
   dataset: WMH
-  data_dir_wmh: data/wmh
+  data_dir_wmh: data/WMH
   #data_dir_brats: data/BraTS
   batch_size: 2
   num_workers: 2
