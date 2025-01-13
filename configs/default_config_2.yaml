@@ -54,7 +54,7 @@ model:
   use_normalization: true
   final_activation:
     class_path: torch.nn.Identity
-  inferer: simple_inferer
+  inferer: simple
   inferer_params: 
       roi_size: [32, 32, 32]
       sw_batch_size: 4
