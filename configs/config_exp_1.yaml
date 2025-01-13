@@ -60,7 +60,7 @@ model:
       sw_batch_size: 4
       overlap: 0.25
   learning_rate: 0.001
-  loss_fn: monai.losses.DiceLoss
+  loss_fn: torch.nn.functional.mse_loss
 data:
   include_keys:
   - flair
