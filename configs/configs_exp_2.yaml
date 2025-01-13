@@ -41,7 +41,7 @@ trainer:
   reload_dataloaders_every_n_epochs: 0
   default_root_dir: null
 model:
-  n_dims: 3
+  n_dims: 2
   input_keys:
   - flair
   - t1
@@ -68,7 +68,7 @@ data:
   - WMH
   dataset: WMH
   data_dir_wmh: data/wmh
-  data_mode: 2d #
+  data_mode: 3d #
   batch_size: 4
   num_workers: 8
 optimizer: torch.optim.Adam
