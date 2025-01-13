@@ -319,10 +319,13 @@ class LitUNet(LightningModule):
                 "accuracy": torchmetrics.classification.Accuracy(task="binary", num_classes=num_classes),
                 "precision": torchmetrics.classification.Precision(task="binary", num_classes=num_classes),
                 "recall": torchmetrics.classification.Recall(task="binary", num_classes=num_classes),
-                "f1": torchmetrics.classification.F1Score(task="binary", num_classes=num_classes)
+                "f1": torchmetrics.classification.F1Score(task="binary", num_classes=num_classes),
+                "dice": torchmetrics.classification.Dice(num_classes=num_classes)
             },
             prefix="val_",
         )
+
+        self.test_metrics = self.validation_metrics.clone(prefix="test_")
         
         self.writer = SummaryWriter()
 
@@ -356,17 +359,15 @@ class LitUNet(LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = self._extract_inputs_and_labels(batch, self.input_keys, self.label_key)
         y_hat = self.inferer(x, self.model)
-
-        # Ensure y is binary
-        # y = (y > 0).int()
         
         # Apply softmax to get probabilities
-        y_hat = self.final_activation(y_hat) # TRYING OUT SHOULD BE CHANGED LATER
-        
-        loss = self.loss_fn(y_hat, y)
-        # self.log("train_loss", loss, prog_bar=True)
+        y_hat = self.final_activation(y_hat) 
 
-        ######## Copied from validation
+        # Calculate Loss
+        loss = self.loss_fn(y_hat, y)
+
+        # Convert predictions to binary labels
+        ### NOTE: this assumes that the logist are converted to probabilties using nn.Sigmoid as the final activation layer
         y_pred = (y_hat > 0.5).int()
 
         # Ensure y is binary
@@ -383,8 +384,6 @@ class LitUNet(LightningModule):
         batch_metric_values = self.train_metrics(y_pred, y_true)
         batch_metric_values['train_loss'] = loss # add loss to metrics
         self.log_dict(batch_metric_values, on_step=True, on_epoch=False, prog_bar=True, logger=True)
-
-        ##############
         
         # Log the loss to TensorBoard
         self.writer.add_scalar("Loss/train", loss, self.global_step)
@@ -409,20 +408,20 @@ class LitUNet(LightningModule):
         # print(f"y_true: {y}") 
 
         # Apply softmax to get probabilities
-        y_hat = self.final_activation(y_hat) # TRYING OUT SHOULD BE CHANGED LATER
+        y_hat = self.final_activation(y_hat)
 
         # calculate loss
         val_loss = self.loss_fn(y_hat, y)
 
-        print("AFTER final activation function") 
-        print(f"y_pred shape: {y_hat.shape}")
-        print(f"y_pred: {y_hat}") 
-        # print(f"y_pred unique values: {torch.unique(y_hat)}")
-        print("====================================================") 
+        # print("AFTER final activation function") 
+        # print(f"y_pred shape: {y_hat.shape}")
+        # print(f"y_pred: {y_hat}") 
+        # # print(f"y_pred unique values: {torch.unique(y_hat)}")
+        # print("====================================================") 
         
         # Convert predictions to binary labels
-        ### NOTE: this assumes that the logist are converted to probabilties using nn.SoftMax as the final activation layer
-        y_pred = (y_hat > 0.5).int() # SOMETHING WRONG HERE
+        ### NOTE: this assumes that the logist are converted to probabilties using nn.Sigmoid as the final activation layer
+        y_pred = (y_hat > 0.5).int() 
 
         # Ensure y is binary
         y = (y > 0).int()
@@ -434,20 +433,14 @@ class LitUNet(LightningModule):
         y_pred = y_pred.view(-1)
         y_true = y_true.view(-1)
         
-        # y_pred = y_hat.argmax(dim=1).cpu().numpy().flatten()
-        # y_true = y.cpu().numpy().flatten()
-        
-        # # Ensure y_true is binary
-        # y_true = (y_true > 0).astype(int)
-
         # DEBUG
-        print("AFTER CONVERSION")
-        print(f"y_pred shape: {y_pred.shape}")
-        print(f"y_pred unique values: {torch.unique(y_pred)}")
+        # print("AFTER CONVERSION")
+        # print(f"y_pred shape: {y_pred.shape}")
+        # print(f"y_pred unique values: {torch.unique(y_pred)}")
         # print(f"y_pred: {y_pred}") # DEBUG
-        print("====================================================")
-        print(f"y_true shape: {y_true.shape}")
-        print(f"y_true unique values: {torch.unique(y_true)}")
+        # print("====================================================")
+        # print(f"y_true shape: {y_true.shape}")
+        # print(f"y_true unique values: {torch.unique(y_true)}")
         # print(f"y_true: {y_true}") # DEBUG
         
         # Calculate F1 score and recall
@@ -463,30 +456,61 @@ class LitUNet(LightningModule):
     def test_step(self, batch, batch_idx):# f1 and recall do not work here
         x, y = self._extract_inputs_and_labels(batch, self.input_keys, self.label_key)
         y_hat = self.inferer(x, self.model)
+
+        # DEBUG
+        # print("BEFORE CONVERSION") 
+        # print(f"y_pred shape: {y_hat.shape}")
+        # print(f"y_pred: {y_hat}") 
+        # print("====================================================") 
+        # print(f"y_true shape: {y.shape}") 
+        # print(f"y_true unique values: {torch.unique(y)}")
+        # print(f"y_true: {y}") 
+
+        # Apply softmax to get probabilities
+        y_hat = self.final_activation(y_hat)
+
+        # calculate loss
         test_loss = self.loss_fn(y_hat, y)
-        self.log("test_loss", test_loss, prog_bar=True)
-        
-        # Log the test loss to TensorBoard
-        self.writer.add_scalar("Loss/test", test_loss, self.global_step)
+
+        # print("AFTER final activation function") 
+        # print(f"y_pred shape: {y_hat.shape}")
+        # print(f"y_pred: {y_hat}") 
+        # # print(f"y_pred unique values: {torch.unique(y_hat)}")
+        # print("====================================================") 
         
         # Convert predictions to binary labels
-        y_pred = y_hat.argmax(dim=1).cpu().numpy().flatten()
-        y_true = y.cpu().numpy().flatten()
+        ### NOTE: this assumes that the logist are converted to probabilties using nn.Sigmoid as the final activation layer
+        y_pred = (y_hat > 0.5).int() 
+
+        # Ensure y is binary
+        y = (y > 0).int()
         
-        # Ensure y_true is binary
-        y_true = (y_true > 0).astype(int)
+        # Ensure y_true is in the correct shape and type
+        y_true = y.squeeze(1).long()
+
+        # Flatten tensors for metric computation
+        y_pred = y_pred.view(-1)
+        y_true = y_true.view(-1)
+        
+        # DEBUG
+        # print("AFTER CONVERSION")
+        # print(f"y_pred shape: {y_pred.shape}")
+        # print(f"y_pred unique values: {torch.unique(y_pred)}")
+        # print(f"y_pred: {y_pred}") # DEBUG
+        # print("====================================================")
+        # print(f"y_true shape: {y_true.shape}")
+        # print(f"y_true unique values: {torch.unique(y_true)}")
+        # print(f"y_true: {y_true}") # DEBUG
         
         # Calculate F1 score and recall
-        test_f1 = f1_score(y_true, y_pred, average='macro')
-        test_recall = recall_score(y_true, y_pred, average='macro')
+        batch_metric_values = self.test_metrics(y_pred, y_true)
+        batch_metric_values['test_loss'] = test_loss # add loss to metrics
+        self.log_dict(batch_metric_values, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         
         # Log the metrics to TensorBoard
-        self.writer.add_scalar("F1/test", test_f1, self.global_step)
-        self.writer.add_scalar("Recall/test", test_recall, self.global_step)
-        
-        # Log the metrics to the progress bar
-        self.log("test_f1", test_f1, prog_bar=True)
-        self.log("test_recall", test_recall, prog_bar=True)
+        self.writer.add_scalar("accuracy/test", batch_metric_values["test_accuracy"], self.global_step)
+        self.writer.add_scalar("precision/test", batch_metric_values["test_precision"], self.global_step)
+        self.writer.add_scalar("Loss/test", test_loss, self.global_step)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
