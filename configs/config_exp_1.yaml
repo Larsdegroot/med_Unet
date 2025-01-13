@@ -20,7 +20,7 @@ trainer:
   limit_predict_batches: null
   overfit_batches: 0.0
   val_check_interval: null
-  check_val_every_n_epoch: 1
+  check_val_every_n_epoch: 10
   num_sanity_val_steps: null
   log_every_n_steps: 5
   enable_checkpointing: True
@@ -30,7 +30,7 @@ trainer:
   gradient_clip_val: null
   gradient_clip_algorithm: null
   deterministic: False
-  benchmark: null
+  benchmark: True
   inference_mode: True
   use_distributed_sampler: true
   profiler: null
@@ -54,7 +54,7 @@ model:
   use_normalization: true
   final_activation:
     class_path: torch.nn.Identity
-  inferer: simple #
+  inferer: simple 
   inferer_params: 
       roi_size: [32, 32, 32]
       sw_batch_size: 4
