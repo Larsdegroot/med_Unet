@@ -268,6 +268,10 @@ class LitUNet(LightningModule):
         self.loss_fn = loss_fn
         self.learning_rate = learning_rate
 
+        #### TEMP ####3
+        # set final activation layer used during validation and train step
+        self.final_activation = nn.Sigmoid()
+
         # Input and label keys
         ### Defining a collate_fn in out dataloader might achieve the same result as what we are doing here
         self.input_keys = input_keys
@@ -357,7 +361,7 @@ class LitUNet(LightningModule):
         # y = (y > 0).int()
         
         # Apply softmax to get probabilities
-        y_hat = torch.softmax(y_hat, dim=1) # TRYING OUT SHOULD BE CHANGED LATER
+        y_hat = self.final_activation(y_hat) # TRYING OUT SHOULD BE CHANGED LATER
         
         loss = self.loss_fn(y_hat, y)
         # self.log("train_loss", loss, prog_bar=True)
@@ -392,25 +396,28 @@ class LitUNet(LightningModule):
     def validation_step(self, batch, batch_idx):# f1 and recall do not work here 
         x, y = self._extract_inputs_and_labels(batch, self.input_keys, self.label_key)
         y_hat = self.inferer(x, self.model)
-        val_loss = self.loss_fn(y_hat, y)
+        
         # self.log("val_loss", val_loss, prog_bar=True)
 
         # DEBUG
-        print("BEFORE CONVERSION") 
-        print(f"y_pred shape: {y_hat.shape}")
-        print(f"y_pred: {y_hat}") 
-        print("====================================================") 
-        print(f"y_true shape: {y.shape}") 
-        print(f"y_true unique values: {torch.unique(y)}")
+        # print("BEFORE CONVERSION") 
+        # print(f"y_pred shape: {y_hat.shape}")
+        # print(f"y_pred: {y_hat}") 
+        # print("====================================================") 
+        # print(f"y_true shape: {y.shape}") 
+        # print(f"y_true unique values: {torch.unique(y)}")
         # print(f"y_true: {y}") 
 
         # Apply softmax to get probabilities
-        y_hat = torch.softmax(y_hat, dim=1) # TRYING OUT SHOULD BE CHANGED LATER
+        y_hat = self.final_activation(y_hat) # TRYING OUT SHOULD BE CHANGED LATER
 
-        print("AFTER SOFTMAX") 
+        # calculate loss
+        val_loss = self.loss_fn(y_hat, y)
+
+        print("AFTER final activation function") 
         print(f"y_pred shape: {y_hat.shape}")
         print(f"y_pred: {y_hat}") 
-        print(f"y_pred unique values: {torch.unique(y_hat)}")
+        # print(f"y_pred unique values: {torch.unique(y_hat)}")
         print("====================================================") 
         
         # Convert predictions to binary labels
