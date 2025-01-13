@@ -67,7 +67,7 @@ data:
   - t1
   - WMH
   dataset: WMH
-  data_dir_wmh: data/wmh
+  data_dir_wmh: data/WMH
   batch_size: 4
   num_workers: 8
 optimizer: torch.optim.Adam
