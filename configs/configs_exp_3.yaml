@@ -39,7 +39,7 @@ trainer:
   plugins: null
   sync_batchnorm: false
   reload_dataloaders_every_n_epochs: 0
-  default_root_dir: "/content/onedrive/med_Unet/logs_exp_3_epochs_100"
+  default_root_dir: /content/drive/MyDrive/Med_Unet/model logs
 model:
   n_dims: 3
   input_keys:
@@ -54,26 +54,22 @@ model:
   use_normalization: true
   final_activation:
     class_path: torch.nn.Identity
-  inferer: sliding_window #
+  inferer: sliding_window 
   inferer_params: 
       roi_size: [32, 32, 32]
       sw_batch_size: 4
       overlap: 0.25
   learning_rate: 0.001
-  loss_fn: monai.losses.DiceLoss
+  loss_fn: torch.nn.functional.mse_loss
 data:
   include_keys:
   - flair
   - t1
   - WMH
   dataset: WMH
-  data_dir_wmh: /content/onedrive/med_Unet/WMH
+  data_dir_wmh: /content/drive/MyDrive/WMH
   batch_size: 4
   num_workers: 8
 optimizer: torch.optim.Adam
-lr_scheduler:
-  class_path: "torch.optim.lr_scheduler.StepLR"
-  init_args:
-    step_size: 10
-    gamma: 0.1
+lr_scheduler: null 
 ckpt_path: null
