@@ -36,6 +36,7 @@ class MRIDataModule(LightningDataModule):
         dataset: str = "WMH",
         data_dir_wmh: str = "data/WMH",
         data_dir_brats: str = "data/BraTS",
+        data_mode: str = "3d",
         batch_size: int = 8,
         num_workers: int = 8,
     ):
