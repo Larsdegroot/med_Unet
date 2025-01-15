@@ -35,6 +35,7 @@ class MRIDataModule(LightningDataModule):
         dataset: str = "WMH",
         data_dir_wmh: str = "data/WMH",
         data_dir_brats: str = "data/BraTS",
+        data_mode: str = "2d",
         batch_size: int = 8,
         num_workers: int = 8,
     ):
@@ -80,6 +81,7 @@ class MRIDataModule(LightningDataModule):
         self.dataset = dataset.lower()
         self.batch_size = batch_size
         self.num_workers = num_workers
+        self.data_mode = data_mode
 
         # Define transformations
         self.train_transforms_wmh_3D = Compose([
@@ -159,22 +161,10 @@ class MRIDataModule(LightningDataModule):
         return filtered_samples
     
     def collect_samples_brats(self, root: Path) -> list[dict]:
-        """
-        Collect all the valid sample paths from the wmh dataset.
 
-        Parameters
-        ----------
-        root : Path
-            Root path of the dataset.
-
-        Returns
-        -------
-        list[dict]
-            List of dictionaries with paths to FLAIR, T1, and WMH files.
-        """
         brats_data_dir = root.joinpath("Data")
         samples = []
-        
+
         for subject_dir in brats_data_dir.iterdir():
             if subject_dir.is_dir():
                 file_paths = subject_dir.glob("*.nii.gz")
@@ -193,10 +183,10 @@ class MRIDataModule(LightningDataModule):
                     elif file_path.stem.split("_")[-1] == "t1.nii":
                         t1_path = file_path
                     else:
-                        print(f"Missing files in {subject_dir}")
-                            
+                        print(f"Unexpected file in {subject_dir}: {file_path}")
+
                 # Ensure all necessary files exist
-                if t1ce_path.exists() and flair_path.exists() and t2_path.exists() and seg_path.exists() and t1_path.exists():
+                if t1ce_path and flair_path and t2_path and seg_path and t1_path:
                     samples.append({
                         "t1ce": t1ce_path,
                         "flair": flair_path,
@@ -204,18 +194,34 @@ class MRIDataModule(LightningDataModule):
                         "seg": seg_path,
                         "t1": t1_path
                     })
-                else:
-                    continue
 
-        # remove file paths that are not in include_keys
-        filtered_samples = []
+        # Convert segmentation labels to multi-channel format
+        converted_samples = []
         for sample in samples:
-            for key in sample.keys():
-                if key not in self.include_keys:
-                    sample.pop(key)
-                    filtered_samples.append(sample)
-                    
-        return filtered_samples
+            seg_path = sample.get("seg")
+            if seg_path:
+                seg_image = LoadImaged(keys=["seg"])({"seg": seg_path})["seg"]
+
+                # Apply label combination logic based on new label mapping
+                label_channels = [
+                    seg_image == 1,  # Necrotic and non-enhancing tumor core
+                    seg_image == 2,  # Peritumoral edema
+                    seg_image == 4,  # Enhancing tumor
+                    torch.logical_or(torch.logical_or(seg_image == 1, seg_image == 4), seg_image == 2)  # Whole tumor
+                ]
+
+                # Stack channels to create multi-channel segmentation
+                multi_channel_label = torch.stack(label_channels, dim=0).float()
+
+                # Save the processed segmentation into the sample
+                sample["multi_channel_seg"] = multi_channel_label
+
+            # Filter the sample to include only necessary keys
+            filtered_sample = {k: v for k, v in sample.items() if k in self.include_keys or k == "multi_channel_seg"}
+            converted_samples.append(filtered_sample)
+
+        return converted_samples
+
 
     def setup(self, stage: str = None):
         """
@@ -238,11 +244,18 @@ class MRIDataModule(LightningDataModule):
             # print(f"Amount of samples in dataset: {len(all_samples)}") # DEBUG
             train_samples, temp_samples = train_test_split(all_samples, train_size=0.8, random_state=42, shuffle=True)
             val_samples, test_samples = train_test_split(temp_samples, test_size=0.5, random_state=42, shuffle=True)
+
+            if self.data_mode.lower() == "2d":
+                # Cache the datasets for performance
+                self.train_dataset = CacheDataset(train_samples, transform=self.train_transforms_wmh_2D)
+                self.val_dataset = CacheDataset(val_samples, transform=self.val_transforms_wmh_2D)
+                self.test_dataset = CacheDataset(test_samples, transform=self.val_transforms_wmh_2D)  # Same transforms for test
                 
-            # Cache the datasets for performance
-            self.train_dataset = CacheDataset(train_samples, transform=self.train_transforms_wmh_3D)
-            self.val_dataset = CacheDataset(val_samples, transform=self.val_transforms_wmh_3D)
-            self.test_dataset = CacheDataset(test_samples, transform=self.val_transforms_wmh_3D)  # Same transforms for test
+            elif self.data_mode.lower() == "3d":
+                # Cache the datasets for performance
+                self.train_dataset = CacheDataset(train_samples, transform=self.train_transforms_wmh_3D)
+                self.val_dataset = CacheDataset(val_samples, transform=self.val_transforms_wmh_3D)
+                self.test_dataset = CacheDataset(test_samples, transform=self.val_transforms_wmh_3D)  # Same transforms for test
 
         elif self.dataset.lower() == "brats": # brats is used for pre_training so no split is required
             train_samples = all_samples
