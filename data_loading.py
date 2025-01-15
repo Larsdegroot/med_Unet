@@ -1,4 +1,5 @@
 import SimpleITK as sitk
+import torch
 from sklearn.model_selection import train_test_split
 from pathlib import Path
 from os.path import abspath
@@ -35,7 +36,6 @@ class MRIDataModule(LightningDataModule):
         dataset: str = "WMH",
         data_dir_wmh: str = "data/WMH",
         data_dir_brats: str = "data/BraTS",
-        data_mode: str = "2d",
         batch_size: int = 8,
         num_workers: int = 8,
     ):
@@ -81,7 +81,6 @@ class MRIDataModule(LightningDataModule):
         self.dataset = dataset.lower()
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.data_mode = data_mode
 
         # Define transformations
         self.train_transforms_wmh_3D = Compose([
