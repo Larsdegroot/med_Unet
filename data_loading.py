@@ -7,6 +7,7 @@ from lightning import LightningDataModule
 from monai.data import CacheDataset
 from monai.transforms import Compose, LoadImaged, EnsureChannelFirstd, ResizeD, NormalizeIntensityd, MapTransform, RandSpatialCropd, RandFlipd, RandRotated, RandAffined
 from lightning.pytorch.utilities.exceptions import MisconfigurationException
+from torch import logical_or, stack
 
 
 ### TODO:
@@ -208,11 +209,31 @@ class MRIDataModule(LightningDataModule):
                     continue
 
         # remove file paths that are not in include_keys
-        filtered_samples = []
+        converted_samples = []
         for sample in samples:
-            filtered_sample = {k: sample.get(k) for k in sample.keys() if k in self.include_keys}
-            filtered_samples.append(sample)
-        return filtered_samples
+            seg_path = sample.get("seg")
+            if seg_path:
+                seg_image = LoadImaged(keys=["seg"])({"seg": seg_path})["seg"]
+
+                # Apply label combination logic based on new label mapping
+                label_channels = [
+                    seg_image == 1,  # Necrotic and non-enhancing tumor core
+                    seg_image == 2,  # Peritumoral edema
+                    seg_image == 4,  # Enhancing tumor
+                    logical_or(logical_or(seg_image == 1, seg_image == 4), seg_image == 2)  # Whole tumor
+                ]
+
+                # Stack channels to create multi-channel segmentation
+                multi_channel_label = stack(label_channels, dim=0).float()
+
+                # Save the processed segmentation into the sample
+                sample["multi_channel_seg"] = multi_channel_label
+
+            # Filter the sample to include only necessary keys
+            filtered_sample = {k: v for k, v in sample.items() if k in self.include_keys or k == "multi_channel_seg"}
+            converted_samples.append(filtered_sample)
+
+        return converted_samples
 
     def setup(self, stage: str = None):
         """
