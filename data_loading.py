@@ -112,7 +112,7 @@ class MRIDataModule(LightningDataModule):
         self.train_transforms_brats = Compose([
             LoadImaged(keys=["t1ce", "t2", "flair", "t1", "seg"]),
             EnsureChannelFirstd(keys=["t1ce", "t2", "flair", "t1", "seg"]),
-            ResizeD(keys=["flair", "t1", "WMH"], spatial_size=(128, 128, 128)), # NEEDS TO BE REMOVED WHEN A BETTER SOLUTION GETS IMPLEMENTED
+            ResizeD(keys=["flair", "t1", "seg"], spatial_size=(128, 128, 128)), # NEEDS TO BE REMOVED WHEN A BETTER SOLUTION GETS IMPLEMENTED
             NormalizeIntensityd(keys=["t1ce", "t2", "flair", "t1"])
         ])
 
@@ -210,11 +210,8 @@ class MRIDataModule(LightningDataModule):
         # remove file paths that are not in include_keys
         filtered_samples = []
         for sample in samples:
-            for key in sample.keys():
-                if key not in self.include_keys:
-                    sample.pop(key)
-                    filtered_samples.append(sample)
-                    
+            filtered_sample = {k: sample.get(k) for k in sample.keys() if k in self.include_keys}
+            filtered_samples.append(sample)
         return filtered_samples
 
     def setup(self, stage: str = None):
@@ -232,6 +229,7 @@ class MRIDataModule(LightningDataModule):
             all_samples.extend(self.collect_samples_wmh(self.data_dir))
         elif self.dataset.lower() == "brats":
             all_samples.extend(self.collect_samples_brats(self.data_dir))
+        print("### all_samples:", all_samples)
         
         # Split into train, validation, and test sets
         if self.dataset.lower() == "wmh":
@@ -245,10 +243,12 @@ class MRIDataModule(LightningDataModule):
             self.test_dataset = CacheDataset(test_samples, transform=self.val_transforms_wmh_3D)  # Same transforms for test
 
         elif self.dataset.lower() == "brats": # brats is used for pre_training so no split is required
-            train_samples = all_samples
+            train_samples, val_samples = train_test_split(all_samples, train_size=0.8, random_state=42, shuffle=True)
 
             # Cache the dataset for performance
             self.train_dataset = CacheDataset(train_samples, transform=self.train_transforms_brats)
+            self.val_dataset = CacheDataset(val_samples, transform=self.train_transforms_brats)
+            
             
     def train_dataloader(self):
         """
