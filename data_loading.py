@@ -37,7 +37,6 @@ class MRIDataModule(LightningDataModule):
         dataset: str = "WMH",
         data_dir_wmh: str = "data/WMH",
         data_dir_brats: str = "data/BraTS",
-        data_mode: str = "3d",
         batch_size: int = 8,
         num_workers: int = 8,
     ):
@@ -246,17 +245,10 @@ class MRIDataModule(LightningDataModule):
             train_samples, temp_samples = train_test_split(all_samples, train_size=0.8, random_state=42, shuffle=True)
             val_samples, test_samples = train_test_split(temp_samples, test_size=0.5, random_state=42, shuffle=True)
 
-            if self.data_mode.lower() == "2d":
-                # Cache the datasets for performance
-                self.train_dataset = CacheDataset(train_samples, transform=self.train_transforms_wmh_2D)
-                self.val_dataset = CacheDataset(val_samples, transform=self.val_transforms_wmh_2D)
-                self.test_dataset = CacheDataset(test_samples, transform=self.val_transforms_wmh_2D)  # Same transforms for test
-                
-            elif self.data_mode.lower() == "3d":
-                # Cache the datasets for performance
-                self.train_dataset = CacheDataset(train_samples, transform=self.train_transforms_wmh_3D)
-                self.val_dataset = CacheDataset(val_samples, transform=self.val_transforms_wmh_3D)
-                self.test_dataset = CacheDataset(test_samples, transform=self.val_transforms_wmh_3D)  # Same transforms for test
+            # Cache the datasets for performance
+            self.train_dataset = CacheDataset(train_samples, transform=self.train_transforms_wmh_3D)
+            self.val_dataset = CacheDataset(val_samples, transform=self.val_transforms_wmh_3D)
+            self.test_dataset = CacheDataset(test_samples, transform=self.val_transforms_wmh_3D)  # Same transforms for test
 
         elif self.dataset.lower() == "brats": # brats is used for pre_training so no split is required
             train_samples, val_samples = train_test_split(all_samples, train_size=0.8, random_state=42, shuffle=True)
