@@ -67,7 +67,7 @@ data:
   - t1
   - seg
   dataset: BraTS
-  data_dir_brats: /content/onedrive/med_Unet/data/BraTS
+  data_dir_brats: /content/onedrive/med_Unet/BraTS
   batch_size: 4
   num_workers: 8
 optimizer: torch.optim.Adam
