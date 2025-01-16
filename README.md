@@ -1,6 +1,8 @@
 # med_Unet
 This is a implementation of a Unet Imagine network to segment brain lessions in MRI images of the brain. This is a project done by students for the course AI for medical imaging.
 
+<a href="https://colab.research.google.com/github/Larsdegroot/med_Unet/blob/main/run_experiment_colab.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+
 ## Environment setup
 
 Recreate the python virtual environment by running:
@@ -46,11 +48,11 @@ python main.py test --config path/to/config.yaml
 ```
 .
 ├── README.md
-├── configs # Configs for the experiments
-├── data # Where to store dataset, you need to create this yourself
-├── data_loading.py # Code to load the dataset
-├── main.py # Code for the CLI that runs either training, validation or testing
-├── old_notebooks # Old notebooks left from during development
-├── requirements.txt # Environment requirements
+├── configs                    # Configs for the experiments
+├── data                       # Where to store dataset, you need to create this yourself
+├── data_loading.py            # Code to load the dataset
+├── main.py                    # Code for the CLI that runs either training, validation or testing
+├── old_notebooks              # Old notebooks left from during development
+├── requirements.txt           # Environment requirements
 └── run_experiment_colab.ipynb # Google Colab notebook to run a experiment
 ```
