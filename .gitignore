@@ -3,6 +3,7 @@ data/*
 
 # Logging
 lightning_logs/*
+runs/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

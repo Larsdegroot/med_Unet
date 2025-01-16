@@ -8,6 +8,7 @@ from lightning import LightningDataModule
 from monai.data import CacheDataset
 from monai.transforms import Compose, LoadImaged, EnsureChannelFirstd, ResizeD, NormalizeIntensityd, MapTransform, RandSpatialCropd, RandFlipd, RandRotated, RandAffined
 from lightning.pytorch.utilities.exceptions import MisconfigurationException
+from torch import logical_or, stack
 
 
 ### TODO:
@@ -114,7 +115,7 @@ class MRIDataModule(LightningDataModule):
         self.train_transforms_brats = Compose([
             LoadImaged(keys=["t1ce", "t2", "flair", "t1", "seg"]),
             EnsureChannelFirstd(keys=["t1ce", "t2", "flair", "t1", "seg"]),
-            ResizeD(keys=["flair", "t1", "WMH"], spatial_size=(128, 128, 128)), # NEEDS TO BE REMOVED WHEN A BETTER SOLUTION GETS IMPLEMENTED
+            ResizeD(keys=["flair", "t1", "seg"], spatial_size=(128, 128, 128)), # NEEDS TO BE REMOVED WHEN A BETTER SOLUTION GETS IMPLEMENTED
             NormalizeIntensityd(keys=["t1ce", "t2", "flair", "t1"])
         ])
 
@@ -195,7 +196,7 @@ class MRIDataModule(LightningDataModule):
                         "t1": t1_path
                     })
 
-        # Convert segmentation labels to multi-channel format
+        # remove file paths that are not in include_keys
         converted_samples = []
         for sample in samples:
             seg_path = sample.get("seg")
@@ -207,11 +208,11 @@ class MRIDataModule(LightningDataModule):
                     seg_image == 1,  # Necrotic and non-enhancing tumor core
                     seg_image == 2,  # Peritumoral edema
                     seg_image == 4,  # Enhancing tumor
-                    torch.logical_or(torch.logical_or(seg_image == 1, seg_image == 4), seg_image == 2)  # Whole tumor
+                    logical_or(logical_or(seg_image == 1, seg_image == 4), seg_image == 2)  # Whole tumor
                 ]
 
                 # Stack channels to create multi-channel segmentation
-                multi_channel_label = torch.stack(label_channels, dim=0).float()
+                multi_channel_label = stack(label_channels, dim=0).float()
 
                 # Save the processed segmentation into the sample
                 sample["multi_channel_seg"] = multi_channel_label
@@ -221,7 +222,6 @@ class MRIDataModule(LightningDataModule):
             converted_samples.append(filtered_sample)
 
         return converted_samples
-
 
     def setup(self, stage: str = None):
         """
@@ -238,6 +238,7 @@ class MRIDataModule(LightningDataModule):
             all_samples.extend(self.collect_samples_wmh(self.data_dir))
         elif self.dataset.lower() == "brats":
             all_samples.extend(self.collect_samples_brats(self.data_dir))
+        print("### all_samples:", all_samples)
         
         # Split into train, validation, and test sets
         if self.dataset.lower() == "wmh":
@@ -258,10 +259,12 @@ class MRIDataModule(LightningDataModule):
                 self.test_dataset = CacheDataset(test_samples, transform=self.val_transforms_wmh_3D)  # Same transforms for test
 
         elif self.dataset.lower() == "brats": # brats is used for pre_training so no split is required
-            train_samples = all_samples
+            train_samples, val_samples = train_test_split(all_samples, train_size=0.8, random_state=42, shuffle=True)
 
             # Cache the dataset for performance
             self.train_dataset = CacheDataset(train_samples, transform=self.train_transforms_brats)
+            self.val_dataset = CacheDataset(val_samples, transform=self.train_transforms_brats)
+            
             
     def train_dataloader(self):
         """

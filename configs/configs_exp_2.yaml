@@ -56,7 +56,7 @@ model:
     class_path: torch.nn.Identity
   inferer: slice #
   inferer_params: 
-      roi_size: [32, 32, 32]
+      roi_size: [32, 32]
       sw_batch_size: 4
       overlap: 0.25
   learning_rate: 0.001
