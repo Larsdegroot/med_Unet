@@ -56,11 +56,11 @@ model:
     class_path: torch.nn.Identity
   inferer: slice #
   inferer_params: 
-      roi_size: [32, 32, 32]
+      roi_size: [32, 32]
       sw_batch_size: 4
       overlap: 0.25
   learning_rate: 0.001
-  loss_fn: monai.losses.DiceLoss
+  loss_fn: torch.nn.functional.mse_loss
 data:
   include_keys:
   - flair
@@ -71,9 +71,5 @@ data:
   batch_size: 4
   num_workers: 8
 optimizer: torch.optim.Adam
-lr_scheduler:
-  class_path: "torch.optim.lr_scheduler.StepLR"
-  init_args:
-    step_size: 10
-    gamma: 0.1
+lr_scheduler: null
 ckpt_path: null
