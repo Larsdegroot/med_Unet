@@ -25,6 +25,17 @@ from torch import logical_or, stack
 CURRENT_DIR = Path(__file__).resolve().parent
 REPO_DIR = CURRENT_DIR  # Adjust if data_loading.py is nested deeper
 
+# Transform to align brats labels to WMH labels
+class ConvertBratsToWMH(MapTransform):
+    def __call__(self, data):
+        d = dict(data)  # Create a copy of the input data
+        for key in self.keys:
+            # print(key)
+            # print(torch.unique(d[key]))
+            d[key] = torch.where(d[key] > 0, torch.tensor(1.0), d[key])
+            # print(torch.unique(d[key]))
+        return d
+
 class MRIDataModule(LightningDataModule):
     """
     PyTorch Lightning DataModule for the WMH dataset.
@@ -112,10 +123,11 @@ class MRIDataModule(LightningDataModule):
         ])
 
         self.train_transforms_brats = Compose([
-            LoadImaged(keys=["t1ce", "t2", "flair", "t1", "seg"]),
-            EnsureChannelFirstd(keys=["t1ce", "t2", "flair", "t1", "seg"]),
-            ResizeD(keys=["flair", "t1", "seg"], spatial_size=(128, 128, 128)), # NEEDS TO BE REMOVED WHEN A BETTER SOLUTION GETS IMPLEMENTED
-            NormalizeIntensityd(keys=["t1ce", "t2", "flair", "t1"])
+            LoadImaged(keys=["t1ce", "t2", "flair", "t1", "seg"], allow_missing_keys=True),
+            EnsureChannelFirstd(keys=["t1ce", "t2", "flair", "t1", "seg"], allow_missing_keys=True),
+            ConvertBratsToWMH(keys=["seg"]),
+            ResizeD(keys=["flair", "t1", "seg"], spatial_size=(128, 128, 128), allow_missing_keys=True), # NEEDS TO BE REMOVED WHEN A BETTER SOLUTION GETS IMPLEMENTED
+            NormalizeIntensityd(keys=["t1ce", "t2", "flair", "t1"], allow_missing_keys=True)
         ])
 
     def collect_samples_wmh(self, root: Path) -> list[dict]:
@@ -152,7 +164,7 @@ class MRIDataModule(LightningDataModule):
         # print(f"include keys: {self.include_keys}") # DEBUG
         # print(f"dataset keys: {list(samples[0].keys())}") # DEBUG
         for sample in samples:
-            for key in sample.keys():
+            for key in list(sample.keys()):
                 if key not in self.include_keys:
                     sample.pop(key)
                 filtered_samples.append(sample)
@@ -196,31 +208,43 @@ class MRIDataModule(LightningDataModule):
                     })
 
         # remove file paths that are not in include_keys
-        converted_samples = []
+        filtered_samples = []
+        # print(f"include keys: {self.include_keys}") # DEBUG
+        # print(f"dataset keys: {list(samples[0].keys())}") # DEBUG
         for sample in samples:
-            seg_path = sample.get("seg")
-            if seg_path:
-                seg_image = LoadImaged(keys=["seg"])({"seg": seg_path})["seg"]
+            for key in list(sample.keys()):
+                if key not in self.include_keys:
+                    sample.pop(key)
+                filtered_samples.append(sample)
+                
+        # converted_samples = []
+        # for sample in samples:
+        #     seg_path = sample.get("seg")
+        #     if seg_path:
+        #         seg_image = LoadImaged(keys=["seg"])({"seg": seg_path})["seg"]
 
-                # Apply label combination logic based on new label mapping
-                label_channels = [
-                    seg_image == 1,  # Necrotic and non-enhancing tumor core
-                    seg_image == 2,  # Peritumoral edema
-                    seg_image == 4,  # Enhancing tumor
-                    logical_or(logical_or(seg_image == 1, seg_image == 4), seg_image == 2)  # Whole tumor
-                ]
+        #         # Apply label combination logic based on new label mapping
+        #         label_channels = [
+        #             seg_image == 1,  # Necrotic and non-enhancing tumor core
+        #             seg_image == 2,  # Peritumoral edema
+        #             seg_image == 4,  # Enhancing tumor
+        #             logical_or(logical_or(seg_image == 1, seg_image == 4), seg_image == 2)  # Whole tumor
+        #         ]
 
-                # Stack channels to create multi-channel segmentation
-                multi_channel_label = stack(label_channels, dim=0).float()
+        #         # Stack channels to create multi-channel segmentation
+        #         multi_channel_label = stack(label_channels, dim=0).float()
 
-                # Save the processed segmentation into the sample
-                sample["multi_channel_seg"] = multi_channel_label
+        #         # Save the processed segmentation into the sample
+        #         sample["multi_channel_seg"] = multi_channel_label
 
-            # Filter the sample to include only necessary keys
-            filtered_sample = {k: v for k, v in sample.items() if k in self.include_keys or k == "multi_channel_seg"}
-            converted_samples.append(filtered_sample)
+        #     # Filter the sample to include only necessary keys
+        #     filtered_sample = {k: v for k, v in sample.items() if k in self.include_keys or k == "multi_channel_seg"}
+        #     converted_samples.append(filtered_sample)
 
-        return converted_samples
+        # DEBUG
+        # print(f"brats unit: {converted_samples[0]}")
+
+        return filtered_samples
 
     def setup(self, stage: str = None):
         """
@@ -237,7 +261,7 @@ class MRIDataModule(LightningDataModule):
             all_samples.extend(self.collect_samples_wmh(self.data_dir))
         elif self.dataset.lower() == "brats":
             all_samples.extend(self.collect_samples_brats(self.data_dir))
-        print("### all_samples:", all_samples)
+        # print("### all_samples:", all_samples)
         
         # Split into train, validation, and test sets
         if self.dataset.lower() == "wmh":

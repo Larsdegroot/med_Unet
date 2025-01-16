@@ -66,8 +66,6 @@ data:
   - flair
   - t1
   - seg
-  - t2
-  - t1ce
   dataset: BraTS
   data_dir_wmh: ./data/BraTS
   batch_size: 4
