@@ -5,10 +5,10 @@ trainer:
   strategy: auto
   devices: auto
   num_nodes: 1
-  precision: 16 #We can set this to a number for reduced memory usage and faster training.
+  precision: null
   logger: null
   callbacks: null # We can add code for this to enable model chekpointing and save the best model. 
-  fast_dev_run: True #True = quick debugging. 
+  fast_dev_run: False #True = quick debugging. 
   max_epochs: 2
   min_epochs: null
   max_steps: -1
@@ -39,13 +39,13 @@ trainer:
   plugins: null
   sync_batchnorm: false
   reload_dataloaders_every_n_epochs: 0
-  default_root_dir: "med_Unet/chekpoints" #This should be changed to "med_Unet/checkpoints" when training with google colab
+  default_root_dir: null
 model: 
   n_dims: 3 #3 = 3 dimensional 2 = 2D etc. 
   input_keys: #input data.
   - flair
   - t1
-  label_key: WMH #Target label.
+  label_key: seg #Target label.
   in_channels: 2  #amount of input keys.
   out_channels: 1
   base_channels: 8 #Amount of features
@@ -65,11 +65,10 @@ data:
   include_keys:
   - flair
   - t1
-  - WMH
-  dataset: WMH
+  - seg
+  dataset: brats
   data_dir_wmh: data/WMH
   data_dir_brats: data/BraTS
-  data_mode: 3d
   batch_size: 4
   num_workers: 8
 optimizer: null
