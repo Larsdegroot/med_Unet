@@ -20,13 +20,13 @@ trainer:
   limit_predict_batches: null
   overfit_batches: 0.0
   val_check_interval: null
-  check_val_every_n_epoch: 5
+  check_val_every_n_epoch: 10
   num_sanity_val_steps: null
   log_every_n_steps: 5
   enable_checkpointing: True
   enable_progress_bar: True
   enable_model_summary: null
-  accumulate_grad_batches: 1
+  accumulate_grad_batches: 10
   gradient_clip_val: null
   gradient_clip_algorithm: null
   deterministic: False
@@ -67,7 +67,7 @@ data:
   - t1
   - seg
   dataset: BraTS
-  data_dir_brats: /content/onedrive/med_Unet/BraTS
+  data_dir_brats: data/BraTS 3
   batch_size: 4
   num_workers: 8
 optimizer: torch.optim.Adam
