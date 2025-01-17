@@ -72,4 +72,4 @@ data:
   num_workers: 2
 optimizer: torch.optim.Adam
 lr_scheduler: null
-ckpt_path: null
+ckpt_path: /content/onedrive/med_Unet/exp_7_1/version_3/checkpoints/epoch=2-step=9.ckpt
