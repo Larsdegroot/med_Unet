@@ -69,7 +69,7 @@ data:
   dataset: BraTS
   data_dir_brats: /content/onedrive/med_Unet/BraTS1
   batch_size: 4
-  num_workers: 8
+  num_workers: 2
 optimizer: torch.optim.Adam
 lr_scheduler: null
 ckpt_path: null
