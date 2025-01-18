@@ -71,9 +71,5 @@ data:
   batch_size: 4
   num_workers: 8
 optimizer: torch.optim.Adam
-lr_scheduler:
-  class_path: "torch.optim.lr_scheduler.StepLR"
-  init_args:
-    step_size: 10
-    gamma: 0.1
+lr_scheduler: null
 ckpt_path: null

@@ -9,7 +9,7 @@ trainer:
   logger: null
   callbacks: null
   fast_dev_run: false
-  max_epochs: 5
+  max_epochs: 20
   min_epochs: null
   max_steps: -1
   min_steps: null
@@ -22,11 +22,11 @@ trainer:
   val_check_interval: null
   check_val_every_n_epoch: 1
   num_sanity_val_steps: null
-  log_every_n_steps: 5
+  log_every_n_steps: 1
   enable_checkpointing: True
   enable_progress_bar: True
   enable_model_summary: null
-  accumulate_grad_batches: 1
+  accumulate_grad_batches: 10
   gradient_clip_val: null
   gradient_clip_algorithm: null
   deterministic: False
@@ -39,9 +39,9 @@ trainer:
   plugins: null
   sync_batchnorm: false
   reload_dataloaders_every_n_epochs: 0
-  default_root_dir: null
+  default_root_dir: /content/onedrive/med_Unet/logs_exp7
 model:
-  n_dims: 3
+  n_dims: 2
   input_keys:
   - flair
   - t1
@@ -54,24 +54,22 @@ model:
   use_normalization: true
   final_activation:
     class_path: torch.nn.Identity
-  inferer: sliding_window #
+  inferer: slice #
   inferer_params: 
-      roi_size: [32, 32, 32]
+      roi_size: [32, 32]
       sw_batch_size: 4
       overlap: 0.25
   learning_rate: 0.001
-  loss_fn: torch.nn.functional.mse_loss
+  loss_fn: monai.losses.dice.DiceLoss
 data:
   include_keys:
   - flair
   - t1
   - seg
-  - t2
-  - t1ce
   dataset: BraTS
-  data_dir_wmh: ./data/BraTS
+  data_dir_brats: data/BraTS 3
   batch_size: 4
-  num_workers: 8
+  num_workers: 2
 optimizer: torch.optim.Adam
 lr_scheduler: null
 ckpt_path: null
