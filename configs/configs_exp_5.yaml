@@ -72,4 +72,4 @@ data:
   num_workers: 8
 optimizer: torch.optim.Adam
 lr_scheduler: null
-ckpt_path: null
+ckpt_path: /content/epoch=99-step=3600_experiment_5.ckpt
