@@ -39,7 +39,7 @@ trainer:
   plugins: null
   sync_batchnorm: false
   reload_dataloaders_every_n_epochs: 0
-  default_root_dir: /content/drive/MyDrive/Med_Unet/model logs/logs_exp_5
+  default_root_dir: /content/onedrive/Utrecht
 model:
   n_dims: 2
   input_keys:
@@ -67,7 +67,7 @@ data:
   - t1
   - WMH
   dataset: WMH
-  data_dir_wmh: /content/drive/MyDrive/WMH
+  data_dir_wmh: /content/onedrive/med_Unet/data/WMH
   batch_size: 2
   num_workers: 8
 optimizer: torch.optim.Adam
