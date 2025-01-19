@@ -39,7 +39,7 @@ trainer:
   plugins: null
   sync_batchnorm: false
   reload_dataloaders_every_n_epochs: 0
-  default_root_dir: /content/onedrive/med_Unet/exp_8_1
+  default_root_dir: /content/onedrive/med_Unet/exp_8n9n10_base
 model:
   n_dims: 2
   input_keys:
