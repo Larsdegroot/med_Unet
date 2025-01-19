@@ -67,7 +67,7 @@ data:
   - t1
   - WMH
   dataset: WMH
-  data_dir_wmh: /content/onedrive/med_Unet/WMH
+  data_dir_wmh: /content/WMH
   batch_size: 4
   num_workers: 8
 optimizer: torch.optim.Adam
